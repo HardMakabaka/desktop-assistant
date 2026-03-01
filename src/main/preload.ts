@@ -1,5 +1,19 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS, StickyNote, CalendarMark } from '../shared/types';
+import type { StickyNote, CalendarMark } from '../shared/types';
+
+const IPC_CHANNELS = {
+  NOTE_GET_ALL: 'note:get-all',
+  NOTE_SAVE: 'note:save',
+  NOTE_DELETE: 'note:delete',
+  NOTE_CREATE: 'note:create',
+  CALENDAR_GET_MARKS: 'calendar:get-marks',
+  CALENDAR_SAVE_MARK: 'calendar:save-mark',
+  CALENDAR_DELETE_MARK: 'calendar:delete-mark',
+  WINDOW_PIN: 'window:pin',
+  WINDOW_CLOSE: 'window:close',
+  WINDOW_OPEN_NOTE: 'window:open-note',
+  WINDOW_OPEN_CALENDAR: 'window:open-calendar',
+} as const;
 
 const api = {
   // 便签
@@ -25,6 +39,10 @@ const api = {
   openCalendar: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_CALENDAR),
 };
 
-contextBridge.exposeInMainWorld('desktopAPI', api);
+try {
+  contextBridge.exposeInMainWorld('desktopAPI', api);
+} catch (error) {
+  console.error('[preload] failed to expose desktopAPI', error);
+}
 
 export type DesktopAPI = typeof api;

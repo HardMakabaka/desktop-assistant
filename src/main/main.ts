@@ -50,6 +50,26 @@ function getPreloadPath(): string {
   return candidates[0];
 }
 
+function verifyBridge(win: BrowserWindow, windowName: string): void {
+  win.webContents.once('did-finish-load', async () => {
+    try {
+      const hasBridge = await win.webContents.executeJavaScript(
+        'typeof window !== "undefined" && typeof window.desktopAPI !== "undefined"',
+        true,
+      );
+
+      if (!hasBridge) {
+        console.error(`[${windowName}] desktopAPI bridge missing`, {
+          url: win.webContents.getURL(),
+          preload: getPreloadPath(),
+        });
+      }
+    } catch (error) {
+      console.error(`[${windowName}] bridge verification failed`, error);
+    }
+  });
+}
+
 function createMainWindow(): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show();
@@ -73,6 +93,7 @@ function createMainWindow(): void {
   });
 
   mainWindow.loadURL(getRendererURL('index'));
+  verifyBridge(mainWindow, 'main-window');
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
     console.error('[main-window] load failed', { errorCode, errorDescription, validatedURL });
@@ -118,6 +139,7 @@ function createNoteWindow(note: StickyNote): void {
   const noteURL = new URL(getRendererURL('note'));
   noteURL.searchParams.set('id', note.id);
   win.loadURL(noteURL.toString());
+  verifyBridge(win, 'note-window');
 
   win.once('ready-to-show', () => {
     if (win.isDestroyed()) return;
@@ -173,6 +195,7 @@ function createCalendarWindow(): void {
   });
 
   calendarWindow.loadURL(getRendererURL('calendar'));
+  verifyBridge(calendarWindow, 'calendar-window');
 
   calendarWindow.once('ready-to-show', () => {
     if (!calendarWindow || calendarWindow.isDestroyed()) return;
