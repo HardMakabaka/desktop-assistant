@@ -4,10 +4,10 @@
   "description": "桌面助手 - 便签与日历桌面小工具",
   "main": "dist/main/main/main.js",
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail \"npm run dev:main\" \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev": "node scripts/dev.mjs",
     "dev:main": "tsc -p tsconfig.main.json --watch",
-    "dev:renderer": "vite --strictPort --port 5173",
-    "dev:electron": "wait-on http://localhost:5173 file:dist/main/main/main.js file:dist/main/main/preload.js && cross-env DESKTOP_ASSISTANT_DEV_URL=http://localhost:5173 electron .",
+    "dev:renderer": "vite",
+    "dev:electron": "electron .",
     "typecheck:main": "tsc -p tsconfig.main.json --noEmit",
     "typecheck:renderer": "tsc -p tsconfig.json --noEmit",
     "typecheck": "npm run typecheck:main && npm run typecheck:renderer",
