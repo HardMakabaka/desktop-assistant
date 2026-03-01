@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
+import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
 import { StoreManager } from './store';
 import { IPC_CHANNELS, StickyNote, CalendarMark } from '../shared/types';
@@ -12,6 +13,7 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 const noteWindows = new Map<string, BrowserWindow>();
 let calendarWindow: BrowserWindow | null = null;
+let cachedPreloadPath: string | null = null;
 
 function getRendererURL(page: string): string {
   if (devServerURL) {
@@ -19,6 +21,33 @@ function getRendererURL(page: string): string {
     return `${normalizedBase}/${page}.html`;
   }
   return pathToFileURL(path.join(__dirname, '../../renderer', `${page}.html`)).href;
+}
+
+function getPreloadPath(): string {
+  if (cachedPreloadPath && existsSync(cachedPreloadPath)) {
+    return cachedPreloadPath;
+  }
+
+  const candidates = [
+    path.join(__dirname, 'preload.js'),
+    path.join(__dirname, '../preload.js'),
+    path.join(process.cwd(), 'dist/main/main/preload.js'),
+    path.join(process.cwd(), 'dist/main/preload.js'),
+  ];
+
+  const resolved = candidates.find(candidate => existsSync(candidate));
+  if (resolved) {
+    cachedPreloadPath = resolved;
+    return resolved;
+  }
+
+  console.error('[preload] preload script not found', {
+    dirname: __dirname,
+    cwd: process.cwd(),
+    candidates,
+  });
+
+  return candidates[0];
 }
 
 function createMainWindow(): void {
@@ -36,7 +65,7 @@ function createMainWindow(): void {
     transparent: false,
     backgroundColor: '#f5f5f5',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -44,6 +73,11 @@ function createMainWindow(): void {
   });
 
   mainWindow.loadURL(getRendererURL('index'));
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('[main-window] load failed', { errorCode, errorDescription, validatedURL });
+  });
+
   if (isDev) mainWindow.webContents.openDevTools({ mode: 'detach' });
 
   mainWindow.on('closed', () => {
@@ -74,7 +108,7 @@ function createNoteWindow(note: StickyNote): void {
     show: false,
     minimizable: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -131,7 +165,7 @@ function createCalendarWindow(): void {
     resizable: false,
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
     },

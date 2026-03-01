@@ -128,6 +128,14 @@ export function MainPanel() {
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [actionError, setActionError] = useState('');
 
+  const getDesktopAPI = () => {
+    const api = window.desktopAPI;
+    if (!api) {
+      throw new Error('桌面桥接未初始化，请通过 Electron 启动应用并重试');
+    }
+    return api;
+  };
+
   const runAction = async (action: () => Promise<unknown>, fallbackMessage: string): Promise<void> => {
     try {
       setActionError('');
@@ -140,7 +148,7 @@ export function MainPanel() {
 
   const loadNotes = async () => {
     await runAction(async () => {
-      const data = await window.desktopAPI.getNotes();
+      const data = await getDesktopAPI().getNotes();
       setNotes(data);
     }, '加载便签失败');
   };
@@ -151,34 +159,34 @@ export function MainPanel() {
 
   const handleNewNote = async () => {
     await runAction(async () => {
-      await window.desktopAPI.createNote();
+      await getDesktopAPI().createNote();
       await loadNotes();
     }, '新建便签失败');
   };
 
   const handleOpenCalendar = async () => {
     await runAction(async () => {
-      await window.desktopAPI.openCalendar();
+      await getDesktopAPI().openCalendar();
     }, '打开日历失败');
   };
 
   const handleOpenNote = async (id: string) => {
     await runAction(async () => {
-      await window.desktopAPI.openNote(id);
+      await getDesktopAPI().openNote(id);
     }, '打开便签失败');
   };
 
   const handleDeleteNote = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     await runAction(async () => {
-      await window.desktopAPI.deleteNote(id);
+      await getDesktopAPI().deleteNote(id);
       await loadNotes();
     }, '删除便签失败');
   };
 
   const handleClose = async () => {
     await runAction(async () => {
-      await window.desktopAPI.closeWindow();
+      await getDesktopAPI().closeWindow();
     }, '关闭窗口失败');
   };
 
