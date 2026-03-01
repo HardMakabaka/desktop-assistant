@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
 import { autoUpdater } from 'electron-updater';
 import { StoreManager } from './store';
-import { IPC_CHANNELS, StickyNote, CalendarMark } from '../shared/types';
+import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse } from '../shared/types';
 
 const devServerURL = process.env.DESKTOP_ASSISTANT_DEV_URL || process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(devServerURL);
@@ -215,6 +215,37 @@ function createCalendarWindow(): void {
   });
 }
 
+function normalizeUpdaterError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return '未知错误';
+}
+
+async function checkForUpdatesManually(): Promise<UpdateCheckResponse> {
+  if (!app.isPackaged || isDev) {
+    return { ok: false, message: '当前为开发模式，无法检查更新' };
+  }
+
+  if (updateDownloaded) {
+    return { ok: true, message: '更新已下载，应用将自动重启安装' };
+  }
+
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    const nextVersion = result?.updateInfo?.version;
+
+    if (nextVersion && nextVersion !== app.getVersion()) {
+      return { ok: true, message: `发现新版本 ${nextVersion}，正在后台下载` };
+    }
+
+    return { ok: true, message: '当前已是最新版本' };
+  } catch (error) {
+    return { ok: false, message: `检查更新失败：${normalizeUpdaterError(error)}` };
+  }
+}
+
 function createTray(): void {
   const icon = nativeImage.createEmpty();
   tray = new Tray(icon);
@@ -227,12 +258,13 @@ function createTray(): void {
     {
       label: '检查更新',
       click: () => {
-        if (!app.isPackaged || isDev) {
-          console.log('[updater] skipped in development mode');
-          return;
-        }
-        autoUpdater.checkForUpdates().catch(error => {
-          console.error('[updater] manual check failed', error);
+        void checkForUpdatesManually().then(result => {
+          if (result.ok) {
+            console.log('[updater]', result.message);
+            return;
+          }
+
+          console.error('[updater]', result.message);
         });
       },
     },
@@ -314,6 +346,10 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.WINDOW_OPEN_CALENDAR, () => {
     createCalendarWindow();
     return true;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, async () => {
+    return checkForUpdatesManually();
   });
 }
 

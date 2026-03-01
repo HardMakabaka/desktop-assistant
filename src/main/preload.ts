@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { StickyNote, CalendarMark } from '../shared/types';
+import type { StickyNote, CalendarMark, UpdateCheckResponse } from '../shared/types';
 
 const IPC_CHANNELS = {
   NOTE_GET_ALL: 'note:get-all',
@@ -13,6 +13,7 @@ const IPC_CHANNELS = {
   WINDOW_CLOSE: 'window:close',
   WINDOW_OPEN_NOTE: 'window:open-note',
   WINDOW_OPEN_CALENDAR: 'window:open-calendar',
+  UPDATE_CHECK: 'update:check',
 } as const;
 
 const api = {
@@ -37,6 +38,7 @@ const api = {
   openNote: (noteId?: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_NOTE, noteId),
   openCalendar: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_CALENDAR),
+  checkForUpdates: (): Promise<UpdateCheckResponse> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
 };
 
 try {

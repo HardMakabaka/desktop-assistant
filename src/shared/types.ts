@@ -19,6 +19,11 @@ export interface CalendarMark {
   color: string;
 }
 
+export interface UpdateCheckResponse {
+  ok: boolean;
+  message: string;
+}
+
 /** IPC 频道 */
 export const IPC_CHANNELS = {
   // 便签
@@ -35,4 +40,5 @@ export const IPC_CHANNELS = {
   WINDOW_CLOSE: 'window:close',
   WINDOW_OPEN_NOTE: 'window:open-note',
   WINDOW_OPEN_CALENDAR: 'window:open-calendar',
+  UPDATE_CHECK: 'update:check',
 } as const;

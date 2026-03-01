@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { StickyNote } from '../../shared/types';
 
 const styles = {
@@ -14,7 +14,54 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px 16px',
+    position: 'relative' as const,
     WebkitAppRegion: 'drag' as unknown as string,
+  },
+  titleActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  settingsWrap: {
+    position: 'relative' as const,
+  },
+  iconBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: '#fff',
+    fontSize: '15px',
+    WebkitAppRegion: 'no-drag' as unknown as string,
+    transition: 'background 0.2s',
+    cursor: 'pointer',
+  },
+  settingsMenu: {
+    position: 'absolute' as const,
+    top: '34px',
+    right: 0,
+    minWidth: '138px',
+    background: 'rgba(23,25,35,0.95)',
+    border: '1px solid rgba(255,255,255,0.18)',
+    borderRadius: '10px',
+    boxShadow: '0 10px 26px rgba(0,0,0,0.28)',
+    padding: '6px',
+    zIndex: 20,
+  },
+  settingsItem: {
+    width: '100%',
+    border: 'none',
+    background: 'transparent',
+    color: '#fff',
+    fontSize: '12px',
+    textAlign: 'left' as const,
+    borderRadius: '8px',
+    padding: '8px 10px',
+    transition: 'background 0.2s',
+    WebkitAppRegion: 'no-drag' as unknown as string,
+    cursor: 'pointer',
   },
   title: {
     fontSize: '16px',
@@ -122,11 +169,32 @@ const styles = {
     fontSize: '13px',
     padding: '20px 0',
   },
+  feedbackError: {
+    marginBottom: '12px',
+    fontSize: '12px',
+    color: '#fff',
+    background: 'rgba(229,57,53,0.28)',
+    border: '1px solid rgba(255,255,255,0.25)',
+    borderRadius: '8px',
+    padding: '8px 10px',
+  },
+  feedbackSuccess: {
+    marginBottom: '12px',
+    fontSize: '12px',
+    color: '#fff',
+    background: 'rgba(67,160,71,0.32)',
+    border: '1px solid rgba(255,255,255,0.25)',
+    borderRadius: '8px',
+    padding: '8px 10px',
+  },
 };
 
 export function MainPanel() {
   const [notes, setNotes] = useState<StickyNote[]>([]);
   const [actionError, setActionError] = useState('');
+  const [actionSuccess, setActionSuccess] = useState('');
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const settingsRef = useRef<HTMLDivElement | null>(null);
 
   const getDesktopAPI = () => {
     const api = window.desktopAPI;
@@ -139,9 +207,11 @@ export function MainPanel() {
   const runAction = async (action: () => Promise<unknown>, fallbackMessage: string): Promise<void> => {
     try {
       setActionError('');
+      setActionSuccess('');
       await action();
     } catch (error) {
       const detail = error instanceof Error ? error.message : fallbackMessage;
+      setActionSuccess('');
       setActionError(detail || fallbackMessage);
     }
   };
@@ -155,6 +225,21 @@ export function MainPanel() {
 
   useEffect(() => {
     loadNotes();
+  }, []);
+
+  useEffect(() => {
+    const onWindowMouseDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (!settingsRef.current || !(target instanceof Node)) return;
+      if (!settingsRef.current.contains(target)) {
+        setShowSettingsMenu(false);
+      }
+    };
+
+    window.addEventListener('mousedown', onWindowMouseDown);
+    return () => {
+      window.removeEventListener('mousedown', onWindowMouseDown);
+    };
   }, []);
 
   const handleNewNote = async () => {
@@ -190,34 +275,74 @@ export function MainPanel() {
     }, '关闭窗口失败');
   };
 
+  const handleCheckUpdates = async () => {
+    setShowSettingsMenu(false);
+    setActionError('');
+    setActionSuccess('');
+
+    try {
+      const result = await getDesktopAPI().checkForUpdates();
+      if (result.ok) {
+        setActionSuccess(result.message);
+        return;
+      }
+
+      setActionError(result.message || '检查更新失败');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : '检查更新失败';
+      setActionError(detail);
+    }
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.titleBar}>
         <span style={styles.title}>桌面助手</span>
-        <button
-          style={styles.closeBtn}
-          onClick={handleClose}
-          onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          aria-label="关闭窗口"
-        >
-          ✕
-        </button>
+        <div style={styles.titleActions}>
+          <div style={styles.settingsWrap} ref={settingsRef}>
+            <button
+              style={styles.iconBtn}
+              onClick={() => setShowSettingsMenu(prev => !prev)}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              aria-label="打开设置菜单"
+            >
+              ⚙
+            </button>
+            {showSettingsMenu ? (
+              <div style={styles.settingsMenu}>
+                <button
+                  style={styles.settingsItem}
+                  onClick={handleCheckUpdates}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  aria-label="检查更新"
+                >
+                  检查更新
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <button
+            style={styles.closeBtn}
+            onClick={handleClose}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            aria-label="关闭窗口"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div style={styles.body}>
+        {actionSuccess ? (
+          <div style={styles.feedbackSuccess}>
+            {actionSuccess}
+          </div>
+        ) : null}
         {actionError ? (
-          <div
-            style={{
-              marginBottom: '12px',
-              fontSize: '12px',
-              color: '#fff',
-              background: 'rgba(229,57,53,0.28)',
-              border: '1px solid rgba(255,255,255,0.25)',
-              borderRadius: '8px',
-              padding: '8px 10px',
-            }}
-          >
+          <div style={styles.feedbackError}>
             操作失败：{actionError}
           </div>
         ) : null}
