@@ -1,0 +1,54 @@
+{
+  "name": "desktop-assistant",
+  "version": "1.0.0",
+  "description": "桌面助手 - 便签与日历桌面小工具",
+  "main": "dist/main/main/main.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:main\" \"npm run dev:renderer\" \"npm run dev:electron\"",
+    "dev:main": "tsc -p tsconfig.main.json --watch",
+    "dev:renderer": "vite",
+    "dev:electron": "wait-on http://localhost:5173 && cross-env DESKTOP_ASSISTANT_DEV_URL=http://localhost:5173 electron .",
+    "typecheck:main": "tsc -p tsconfig.main.json --noEmit",
+    "typecheck:renderer": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run typecheck:main && npm run typecheck:renderer",
+    "test": "npm run typecheck && npm run build",
+    "verify": "npm run test",
+    "auto:commit": "node scripts/auto-commit.mjs",
+    "build:main": "tsc -p tsconfig.main.json",
+    "build:renderer": "vite build",
+    "build": "npm run build:main && npm run build:renderer",
+    "start": "npm run build && electron .",
+    "pack": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.48",
+    "@types/react-dom": "^18.2.18",
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "cross-env": "^7.0.3",
+    "electron": "^28.1.3",
+    "electron-builder": "^24.9.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.desktop-assistant.app",
+    "productName": "桌面助手",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "resources/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  }
+}
