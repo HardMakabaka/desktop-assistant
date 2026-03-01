@@ -70,26 +70,6 @@ function verifyBridge(win: BrowserWindow, windowName: string): void {
   });
 }
 
-function closeCalendarWindow(): void {
-  if (!calendarWindow || calendarWindow.isDestroyed()) {
-    calendarWindow = null;
-    return;
-  }
-
-  calendarWindow.close();
-  calendarWindow = null;
-}
-
-function closeNoteWindows(keepId?: string): void {
-  for (const [id, win] of Array.from(noteWindows.entries())) {
-    if (keepId && id === keepId) continue;
-    if (!win.isDestroyed()) {
-      win.close();
-    }
-    noteWindows.delete(id);
-  }
-}
-
 function createMainWindow(): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show();
@@ -127,9 +107,6 @@ function createMainWindow(): void {
 }
 
 function createNoteWindow(note: StickyNote): void {
-  closeCalendarWindow();
-  closeNoteWindows(note.id);
-
   if (noteWindows.has(note.id)) {
     const existing = noteWindows.get(note.id)!;
     if (!existing.isDestroyed()) {
@@ -194,8 +171,6 @@ function createNoteWindow(note: StickyNote): void {
 }
 
 function createCalendarWindow(): void {
-  closeNoteWindows();
-
   if (calendarWindow && !calendarWindow.isDestroyed()) {
     calendarWindow.show();
     calendarWindow.focus();
@@ -328,26 +303,40 @@ function setupIPC(): void {
 }
 
 // App lifecycle
-app.whenReady().then(() => {
-  setupIPC();
-  createTray();
-  createMainWindow();
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
-  const notes = store.getAllNotes();
-  const pinned = notes.filter(n => n.pinned).sort((a, b) => b.updatedAt - a.updatedAt);
-  if (pinned[0]) {
-    createNoteWindow(pinned[0]);
-  }
-});
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+      return;
+    }
 
-app.on('window-all-closed', () => {
-  // 不退出，保持托盘运行
-});
+    createMainWindow();
+  });
 
-app.on('activate', () => {
-  createMainWindow();
-});
+  app.whenReady().then(() => {
+    setupIPC();
+    createTray();
+    createMainWindow();
 
-app.on('before-quit', () => {
-  tray?.destroy();
-});
+    const notes = store.getAllNotes();
+    notes.filter(n => n.pinned).forEach(n => createNoteWindow(n));
+  });
+
+  app.on('window-all-closed', () => {
+    // 不退出，保持托盘运行
+  });
+
+  app.on('activate', () => {
+    createMainWindow();
+  });
+
+  app.on('before-quit', () => {
+    tray?.destroy();
+  });
+}
