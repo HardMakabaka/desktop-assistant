@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron';
 import * as path from 'path';
 import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
+import { autoUpdater } from 'electron-updater';
 import { StoreManager } from './store';
 import { IPC_CHANNELS, StickyNote, CalendarMark } from '../shared/types';
 
@@ -14,6 +15,8 @@ let tray: Tray | null = null;
 const noteWindows = new Map<string, BrowserWindow>();
 let calendarWindow: BrowserWindow | null = null;
 let cachedPreloadPath: string | null = null;
+let updateCheckTimer: NodeJS.Timeout | null = null;
+let updateDownloaded = false;
 
 function getRendererURL(page: string): string {
   if (devServerURL) {
@@ -221,6 +224,18 @@ function createTray(): void {
     { label: '打开主面板', click: () => createMainWindow() },
     { label: '新建便签', click: () => handleCreateNote() },
     { label: '打开日历', click: () => createCalendarWindow() },
+    {
+      label: '检查更新',
+      click: () => {
+        if (!app.isPackaged || isDev) {
+          console.log('[updater] skipped in development mode');
+          return;
+        }
+        autoUpdater.checkForUpdates().catch(error => {
+          console.error('[updater] manual check failed', error);
+        });
+      },
+    },
     { type: 'separator' },
     { label: '退出', click: () => app.quit() },
   ]);
@@ -302,6 +317,70 @@ function setupIPC(): void {
   });
 }
 
+function setupAutoUpdater(): void {
+  if (!app.isPackaged || isDev) {
+    console.log('[updater] disabled in development mode');
+    return;
+  }
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('checking-for-update', () => {
+    console.log('[updater] checking for updates');
+  });
+
+  autoUpdater.on('update-available', info => {
+    console.log('[updater] update available', info.version);
+  });
+
+  autoUpdater.on('update-not-available', info => {
+    console.log('[updater] no updates', info.version);
+  });
+
+  autoUpdater.on('error', error => {
+    console.error('[updater] error', error);
+  });
+
+  autoUpdater.on('download-progress', progress => {
+    console.log('[updater] download progress', `${Math.round(progress.percent)}%`);
+  });
+
+  autoUpdater.on('update-downloaded', async info => {
+    updateDownloaded = true;
+    console.log('[updater] update downloaded', info.version);
+
+    await dialog.showMessageBox({
+      type: 'info',
+      title: '发现新版本',
+      message: `新版本 ${info.version} 已下载完成`,
+      detail: '应用将在 3 秒后自动重启并完成更新安装。',
+      buttons: ['确定'],
+      defaultId: 0,
+    });
+
+    if (updateCheckTimer) {
+      clearInterval(updateCheckTimer);
+      updateCheckTimer = null;
+    }
+
+    setTimeout(() => {
+      autoUpdater.quitAndInstall();
+    }, 3000);
+  });
+
+  autoUpdater.checkForUpdates().catch(error => {
+    console.error('[updater] initial check failed', error);
+  });
+
+  updateCheckTimer = setInterval(() => {
+    if (updateDownloaded) return;
+    autoUpdater.checkForUpdates().catch(error => {
+      console.error('[updater] scheduled check failed', error);
+    });
+  }, 1000 * 60 * 30);
+}
+
 // App lifecycle
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
@@ -321,6 +400,7 @@ if (!gotSingleInstanceLock) {
 
   app.whenReady().then(() => {
     setupIPC();
+    setupAutoUpdater();
     createTray();
     createMainWindow();
 
@@ -337,6 +417,10 @@ if (!gotSingleInstanceLock) {
   });
 
   app.on('before-quit', () => {
+    if (updateCheckTimer) {
+      clearInterval(updateCheckTimer);
+      updateCheckTimer = null;
+    }
     tray?.destroy();
   });
 }
