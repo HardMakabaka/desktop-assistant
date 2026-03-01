@@ -61,6 +61,7 @@
           ]
         }
       ],
+      "executableName": "desktop-assistant",
       "icon": "resources/icon.ico"
     },
     "nsis": {
