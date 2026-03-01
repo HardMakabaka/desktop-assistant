@@ -3,6 +3,7 @@ export interface StickyNote {
   id: string;
   content: string;
   color: string;
+  opacity: number;
   x: number;
   y: number;
   width: number;
@@ -17,6 +18,11 @@ export interface CalendarMark {
   date: string; // YYYY-MM-DD
   label: string;
   color: string;
+}
+
+export interface CalendarAppearance {
+  color: string;
+  opacity: number;
 }
 
 export interface UpdateCheckResponse {
@@ -35,6 +41,8 @@ export const IPC_CHANNELS = {
   CALENDAR_GET_MARKS: 'calendar:get-marks',
   CALENDAR_SAVE_MARK: 'calendar:save-mark',
   CALENDAR_DELETE_MARK: 'calendar:delete-mark',
+  CALENDAR_GET_APPEARANCE: 'calendar:get-appearance',
+  CALENDAR_SAVE_APPEARANCE: 'calendar:save-appearance',
   // 窗口
   WINDOW_PIN: 'window:pin',
   WINDOW_CLOSE: 'window:close',

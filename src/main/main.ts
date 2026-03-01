@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
 import { autoUpdater } from 'electron-updater';
 import { StoreManager } from './store';
-import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse } from '../shared/types';
+import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse, CalendarAppearance } from '../shared/types';
 
 const devServerURL = process.env.DESKTOP_ASSISTANT_DEV_URL || process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(devServerURL);
@@ -317,6 +317,14 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.CALENDAR_DELETE_MARK, (_event, date: string) => {
     store.deleteMark(date);
     return true;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_GET_APPEARANCE, () => {
+    return store.getCalendarAppearance();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.CALENDAR_SAVE_APPEARANCE, (_event, appearance: Partial<CalendarAppearance>) => {
+    return store.saveCalendarAppearance(appearance);
   });
 
   // 窗口 IPC

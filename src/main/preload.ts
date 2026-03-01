@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { StickyNote, CalendarMark, UpdateCheckResponse } from '../shared/types';
+import type { StickyNote, CalendarMark, UpdateCheckResponse, CalendarAppearance } from '../shared/types';
 
 const IPC_CHANNELS = {
   NOTE_GET_ALL: 'note:get-all',
@@ -9,6 +9,8 @@ const IPC_CHANNELS = {
   CALENDAR_GET_MARKS: 'calendar:get-marks',
   CALENDAR_SAVE_MARK: 'calendar:save-mark',
   CALENDAR_DELETE_MARK: 'calendar:delete-mark',
+  CALENDAR_GET_APPEARANCE: 'calendar:get-appearance',
+  CALENDAR_SAVE_APPEARANCE: 'calendar:save-appearance',
   WINDOW_PIN: 'window:pin',
   WINDOW_CLOSE: 'window:close',
   WINDOW_OPEN_NOTE: 'window:open-note',
@@ -30,6 +32,10 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_SAVE_MARK, mark),
   deleteMark: (date: string): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_DELETE_MARK, date),
+  getCalendarAppearance: (): Promise<CalendarAppearance> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_GET_APPEARANCE),
+  saveCalendarAppearance: (appearance: Partial<CalendarAppearance>): Promise<CalendarAppearance> =>
+    ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_SAVE_APPEARANCE, appearance),
 
   // 窗口
   pinWindow: (pinned: boolean): Promise<boolean> =>

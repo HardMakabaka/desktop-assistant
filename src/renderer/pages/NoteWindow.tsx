@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import type { StickyNote } from '../../shared/types';
 
+const NOTE_COLORS = ['#fff9c4', '#c8e6c9', '#bbdefb', '#f8bbd0', '#e1bee7', '#ffe0b2', '#d7ccc8', '#b2dfdb'];
+
 const styles = {
   container: {
     height: '100vh',
@@ -47,10 +49,35 @@ const styles = {
     color: 'rgba(0,0,0,0.8)',
   },
   footer: {
-    padding: '4px 10px 6px',
+    padding: '6px 10px 8px',
     fontSize: '10px',
     color: 'rgba(0,0,0,0.3)',
-    textAlign: 'right' as const,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+  },
+  colorRow: {
+    display: 'flex',
+    gap: '6px',
+  },
+  colorDot: {
+    width: 14,
+    height: 14,
+    borderRadius: '50%',
+    border: '1px solid rgba(0,0,0,0.12)',
+    cursor: 'pointer',
+    transition: 'transform 0.15s, box-shadow 0.15s',
+  },
+  rangeWrap: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    color: 'rgba(0,0,0,0.45)',
+    fontSize: '10px',
+  },
+  range: {
+    width: '78px',
   },
 };
 
@@ -111,6 +138,20 @@ export function NoteWindow() {
     window.desktopAPI.closeWindow();
   };
 
+  const handleColorChange = (color: string) => {
+    if (!note) return;
+    const next = { ...note, color };
+    setNote(next);
+    window.desktopAPI.saveNote({ id: note.id, color });
+  };
+
+  const handleOpacityChange = (opacity: number) => {
+    if (!note) return;
+    const next = { ...note, opacity };
+    setNote(next);
+    window.desktopAPI.saveNote({ id: note.id, opacity });
+  };
+
   if (!note) return null;
 
   const darkenColor = (hex: string, amount: number): string => {
@@ -118,14 +159,26 @@ export function NoteWindow() {
     const r = Math.max(0, (num >> 16) - amount);
     const g = Math.max(0, ((num >> 8) & 0x00ff) - amount);
     const b = Math.max(0, (num & 0x0000ff) - amount);
-    return `rgb(${r},${g},${b})`;
+    return `#${[r, g, b].map(v => v.toString(16).padStart(2, '0')).join('')}`;
   };
 
   const headerBg = darkenColor(note.color, 15);
+  const normalizedOpacity = Math.min(1, Math.max(0.2, note.opacity ?? 0.92));
+
+  const toRgba = (hex: string, alpha: number): string => {
+    const value = hex.replace('#', '');
+    const color = value.length === 3
+      ? value.split('').map(ch => ch + ch).join('')
+      : value;
+    const r = Number.parseInt(color.slice(0, 2), 16);
+    const g = Number.parseInt(color.slice(2, 4), 16);
+    const b = Number.parseInt(color.slice(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  };
 
   return (
-    <div style={{ ...styles.container, background: note.color }}>
-      <div style={{ ...styles.header, background: headerBg }}>
+    <div style={{ ...styles.container, background: toRgba(note.color, normalizedOpacity) }}>
+      <div style={{ ...styles.header, background: toRgba(headerBg, Math.min(1, normalizedOpacity + 0.06)) }}>
         <div style={styles.headerActions}>
           <button
             style={{
@@ -181,7 +234,37 @@ export function NoteWindow() {
       />
 
       <div style={styles.footer}>
-        {new Date(note.updatedAt).toLocaleString('zh-CN')}
+        <div style={styles.colorRow}>
+          {NOTE_COLORS.map(color => (
+            <div
+              key={color}
+              style={{
+                ...styles.colorDot,
+                background: color,
+                transform: color === note.color ? 'scale(1.15)' : 'scale(1)',
+                boxShadow: color === note.color ? '0 0 0 2px rgba(0,0,0,0.18)' : 'none',
+              }}
+              role="button"
+              tabIndex={0}
+              onClick={() => handleColorChange(color)}
+              onKeyDown={e => e.key === 'Enter' && handleColorChange(color)}
+              aria-label={`设置便签颜色 ${color}`}
+            />
+          ))}
+        </div>
+        <div style={styles.rangeWrap}>
+          <span>透明度</span>
+          <input
+            style={styles.range}
+            type="range"
+            min={20}
+            max={100}
+            value={Math.round(normalizedOpacity * 100)}
+            onChange={e => handleOpacityChange(Number(e.target.value) / 100)}
+            aria-label="调整便签透明度"
+          />
+          <span>{Math.round(normalizedOpacity * 100)}%</span>
+        </div>
       </div>
     </div>
   );
