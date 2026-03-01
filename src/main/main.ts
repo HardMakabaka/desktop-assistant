@@ -70,6 +70,26 @@ function verifyBridge(win: BrowserWindow, windowName: string): void {
   });
 }
 
+function closeCalendarWindow(): void {
+  if (!calendarWindow || calendarWindow.isDestroyed()) {
+    calendarWindow = null;
+    return;
+  }
+
+  calendarWindow.close();
+  calendarWindow = null;
+}
+
+function closeNoteWindows(keepId?: string): void {
+  for (const [id, win] of Array.from(noteWindows.entries())) {
+    if (keepId && id === keepId) continue;
+    if (!win.isDestroyed()) {
+      win.close();
+    }
+    noteWindows.delete(id);
+  }
+}
+
 function createMainWindow(): void {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.show();
@@ -107,6 +127,9 @@ function createMainWindow(): void {
 }
 
 function createNoteWindow(note: StickyNote): void {
+  closeCalendarWindow();
+  closeNoteWindows(note.id);
+
   if (noteWindows.has(note.id)) {
     const existing = noteWindows.get(note.id)!;
     if (!existing.isDestroyed()) {
@@ -171,6 +194,8 @@ function createNoteWindow(note: StickyNote): void {
 }
 
 function createCalendarWindow(): void {
+  closeNoteWindows();
+
   if (calendarWindow && !calendarWindow.isDestroyed()) {
     calendarWindow.show();
     calendarWindow.focus();
@@ -308,9 +333,11 @@ app.whenReady().then(() => {
   createTray();
   createMainWindow();
 
-  // 恢复之前固定的便签
   const notes = store.getAllNotes();
-  notes.filter(n => n.pinned).forEach(n => createNoteWindow(n));
+  const pinned = notes.filter(n => n.pinned).sort((a, b) => b.updatedAt - a.updatedAt);
+  if (pinned[0]) {
+    createNoteWindow(pinned[0]);
+  }
 });
 
 app.on('window-all-closed', () => {
