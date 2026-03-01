@@ -1,6 +1,6 @@
 {
   "name": "desktop-assistant",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "桌面助手 - 便签与日历桌面小工具",
   "author": "HardMakabaka",
   "main": "dist/main/main/main.js",
