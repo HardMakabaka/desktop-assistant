@@ -15,7 +15,6 @@ let tray: Tray | null = null;
 const noteWindows = new Map<string, BrowserWindow>();
 let calendarWindow: BrowserWindow | null = null;
 let cachedPreloadPath: string | null = null;
-let updateCheckTimer: NodeJS.Timeout | null = null;
 let updateDownloaded = false;
 
 function getRendererURL(page: string): string {
@@ -395,26 +394,10 @@ function setupAutoUpdater(): void {
       defaultId: 0,
     });
 
-    if (updateCheckTimer) {
-      clearInterval(updateCheckTimer);
-      updateCheckTimer = null;
-    }
-
     setTimeout(() => {
       autoUpdater.quitAndInstall();
     }, 3000);
   });
-
-  autoUpdater.checkForUpdates().catch(error => {
-    console.error('[updater] initial check failed', error);
-  });
-
-  updateCheckTimer = setInterval(() => {
-    if (updateDownloaded) return;
-    autoUpdater.checkForUpdates().catch(error => {
-      console.error('[updater] scheduled check failed', error);
-    });
-  }, 1000 * 60 * 30);
 }
 
 // App lifecycle
@@ -453,10 +436,6 @@ if (!gotSingleInstanceLock) {
   });
 
   app.on('before-quit', () => {
-    if (updateCheckTimer) {
-      clearInterval(updateCheckTimer);
-      updateCheckTimer = null;
-    }
     tray?.destroy();
   });
 }
