@@ -27,15 +27,52 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            rpm
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify
-        run: npm run verify
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Print Tauri environment info
+        run: npm run tauri -- info
+
+      - name: Tauri build smoke (no bundle)
+        run: npm run tauri -- build --bundles none
+
+      - name: Diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "node: $(node -v)"
+          echo "npm: $(npm -v)"
+          rustc --version || true
+          cargo --version || true
+          rustup show || true
+          npm run tauri -- info || true
 
   package-linux:
     name: Package Linux (deb + rpm)
     runs-on: ubuntu-latest
+    needs: verify
 
     steps:
       - name: Checkout
@@ -47,13 +84,43 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install Linux packaging dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y rpm
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            rpm
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build deb/rpm packages (no publish)
-        run: npm run pack:linux -- --publish never
+      - name: Build deb/rpm packages
+        run: npm run pack:linux
+
+      - name: Upload Linux package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+          if-no-files-found: error
+
+      - name: Diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          echo "node: $(node -v)"
+          echo "npm: $(npm -v)"
+          rustc --version || true
+          cargo --version || true
+          rustup show || true
+          npm run tauri -- info || true
