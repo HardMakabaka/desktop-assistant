@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, NativeImage } from 'electron';
 import * as path from 'path';
 import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
@@ -16,6 +16,30 @@ const noteWindows = new Map<string, BrowserWindow>();
 let calendarWindow: BrowserWindow | null = null;
 let cachedPreloadPath: string | null = null;
 let updateDownloaded = false;
+
+function createTrayIcon(): NativeImage {
+  const iconSVG = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#4f8cff" />
+          <stop offset="100%" stop-color="#6f6cff" />
+        </linearGradient>
+      </defs>
+      <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bg)" />
+      <rect x="19" y="18" width="26" height="28" rx="5" fill="#ffffff" opacity="0.95" />
+      <line x1="23" y1="28" x2="41" y2="28" stroke="#4f8cff" stroke-width="3" stroke-linecap="round" />
+      <line x1="23" y1="34" x2="37" y2="34" stroke="#4f8cff" stroke-width="3" stroke-linecap="round" />
+      <line x1="23" y1="40" x2="35" y2="40" stroke="#4f8cff" stroke-width="3" stroke-linecap="round" />
+    </svg>
+  `;
+
+  const dataURL = `data:image/svg+xml;base64,${Buffer.from(iconSVG).toString('base64')}`;
+  const icon = nativeImage.createFromDataURL(dataURL);
+
+  const traySize = process.platform === 'linux' ? 22 : 16;
+  return icon.resize({ width: traySize, height: traySize });
+}
 
 function getRendererURL(page: string): string {
   if (devServerURL) {
@@ -227,6 +251,10 @@ async function checkForUpdatesManually(): Promise<UpdateCheckResponse> {
     return { ok: false, message: '当前为开发模式，无法检查更新' };
   }
 
+  if (process.platform === 'linux') {
+    return { ok: true, message: 'Linux 版本请通过系统包管理器更新（apt/dnf/yum）' };
+  }
+
   if (updateDownloaded) {
     return { ok: true, message: '更新已下载，应用将自动重启安装' };
   }
@@ -246,8 +274,7 @@ async function checkForUpdatesManually(): Promise<UpdateCheckResponse> {
 }
 
 function createTray(): void {
-  const icon = nativeImage.createEmpty();
-  tray = new Tray(icon);
+  tray = new Tray(createTrayIcon());
   tray.setToolTip('桌面助手');
 
   const contextMenu = Menu.buildFromTemplate([
@@ -272,6 +299,12 @@ function createTray(): void {
   ]);
 
   tray.setContextMenu(contextMenu);
+
+  if (process.platform === 'linux') {
+    tray.on('click', () => createMainWindow());
+    return;
+  }
+
   tray.on('double-click', () => createMainWindow());
 }
 
@@ -363,6 +396,11 @@ function setupIPC(): void {
 function setupAutoUpdater(): void {
   if (!app.isPackaged || isDev) {
     console.log('[updater] disabled in development mode');
+    return;
+  }
+
+  if (process.platform === 'linux') {
+    console.log('[updater] disabled on linux package builds');
     return;
   }
 
