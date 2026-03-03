@@ -163,6 +163,27 @@ const styles = {
     transition: 'color 0.2s',
     WebkitAppRegion: 'no-drag' as unknown as string,
   },
+  trashMeta: {
+    fontSize: '11px',
+    opacity: 0.72,
+    marginLeft: '8px',
+  },
+  actionGroup: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  actionBtn: {
+    border: '1px solid rgba(255,255,255,0.28)',
+    borderRadius: '6px',
+    padding: '3px 8px',
+    fontSize: '11px',
+    color: '#fff',
+    background: 'rgba(255,255,255,0.08)',
+    cursor: 'pointer',
+    transition: 'background 0.2s',
+    WebkitAppRegion: 'no-drag' as unknown as string,
+  },
   empty: {
     textAlign: 'center' as const,
     opacity: 0.5,
@@ -191,6 +212,7 @@ const styles = {
 
 export function MainPanel() {
   const [notes, setNotes] = useState<StickyNote[]>([]);
+  const [trashNotes, setTrashNotes] = useState<StickyNote[]>([]);
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -218,9 +240,18 @@ export function MainPanel() {
   };
 
   const loadNotes = async () => {
+    const data = await getDesktopAPI().getNotes();
+    setNotes(data);
+  };
+
+  const loadTrashNotes = async () => {
+    const data = await getDesktopAPI().getTrashNotes();
+    setTrashNotes(data);
+  };
+
+  const refreshNotes = async () => {
     await runAction(async () => {
-      const data = await getDesktopAPI().getNotes();
-      setNotes(data);
+      await Promise.all([loadNotes(), loadTrashNotes()]);
     }, '加载便签失败');
   };
 
@@ -234,7 +265,7 @@ export function MainPanel() {
   };
 
   useEffect(() => {
-    void loadNotes();
+    void refreshNotes();
     void loadStartupStatus();
   }, []);
 
@@ -256,7 +287,7 @@ export function MainPanel() {
   const handleNewNote = async () => {
     await runAction(async () => {
       await getDesktopAPI().createNote();
-      await loadNotes();
+      await refreshNotes();
     }, '新建便签失败');
   };
 
@@ -276,8 +307,34 @@ export function MainPanel() {
     e.stopPropagation();
     await runAction(async () => {
       await getDesktopAPI().deleteNote(id);
-      await loadNotes();
+      await refreshNotes();
+      setActionSuccess('已移入垃圾桶');
     }, '删除便签失败');
+  };
+
+  const handleRestoreNote = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await runAction(async () => {
+      await getDesktopAPI().restoreNote(id);
+      await refreshNotes();
+      setActionSuccess('便签已恢复');
+    }, '恢复便签失败');
+  };
+
+  const handlePermanentlyDeleteNote = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('确认要永久删除这条便签吗？此操作不可撤销。')) {
+      return;
+    }
+    if (!window.confirm('请再次确认：永久删除后将无法恢复。继续吗？')) {
+      return;
+    }
+
+    await runAction(async () => {
+      await getDesktopAPI().permanentlyDeleteNote(id);
+      await refreshNotes();
+      setActionSuccess('便签已永久删除');
+    }, '永久删除便签失败');
   };
 
   const handleClose = async () => {
@@ -457,12 +514,52 @@ export function MainPanel() {
                   <button
                     style={styles.noteDelete}
                     onClick={e => handleDeleteNote(e, note.id)}
-                    onMouseEnter={e => (e.currentTarget.style.color = '#ff6b6b')}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#ffb74d')}
                     onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
-                    aria-label={`删除便签: ${note.content.slice(0, 20) || '空便签'}`}
+                    title={`移入垃圾桶: ${note.content.slice(0, 20) || '空便签'}`}
+                    aria-label={`移入垃圾桶: ${note.content.slice(0, 20) || '空便签'}`}
                   >
-                    ✕
+                    🗑
                   </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>垃圾桶 ({trashNotes.length})</div>
+          {trashNotes.length === 0 ? (
+            <div style={styles.empty}>垃圾桶为空</div>
+          ) : (
+            <div style={styles.noteList}>
+              {trashNotes.map(note => (
+                <div key={note.id} style={styles.noteItem}>
+                  <span style={{ ...styles.noteColor, background: note.color }} />
+                  <span style={styles.noteText}>
+                    {note.content || '空便签'}
+                    <span style={styles.trashMeta}>已删除</span>
+                  </span>
+                  <div style={styles.actionGroup}>
+                    <button
+                      style={styles.actionBtn}
+                      onClick={e => handleRestoreNote(e, note.id)}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(67,160,71,0.35)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                      aria-label={`恢复便签: ${note.content.slice(0, 20) || '空便签'}`}
+                    >
+                      恢复
+                    </button>
+                    <button
+                      style={styles.actionBtn}
+                      onClick={e => handlePermanentlyDeleteNote(e, note.id)}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'rgba(229,57,53,0.35)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                      aria-label={`永久删除便签: ${note.content.slice(0, 20) || '空便签'}`}
+                    >
+                      永久删除
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

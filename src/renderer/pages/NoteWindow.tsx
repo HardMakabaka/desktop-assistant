@@ -129,9 +129,10 @@ export function NoteWindow() {
     await window.desktopAPI.saveNote({ id: note.id, pinned: newPinned });
   };
 
-  const handleDelete = async () => {
+  const handleMoveToTrash = async () => {
     if (!note) return;
     await window.desktopAPI.deleteNote(note.id);
+    await window.desktopAPI.closeWindow();
   };
 
   const handleClose = () => {
@@ -197,19 +198,19 @@ export function NoteWindow() {
         <div style={styles.headerActions}>
           <button
             style={styles.iconBtn}
-            onClick={handleDelete}
+            onClick={handleMoveToTrash}
             onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(229,57,53,0.15)';
-              e.currentTarget.style.color = '#e53935';
+              e.currentTarget.style.background = 'rgba(255,152,0,0.18)';
+              e.currentTarget.style.color = '#ef6c00';
             }}
             onMouseLeave={e => {
               e.currentTarget.style.background = 'transparent';
               e.currentTarget.style.color = 'rgba(0,0,0,0.5)';
             }}
-            title="删除便签"
-            aria-label="删除便签"
+            title="移入垃圾桶"
+            aria-label="移入垃圾桶"
           >
-            🗑
+            🗂
           </button>
           <button
             style={styles.iconBtn}
