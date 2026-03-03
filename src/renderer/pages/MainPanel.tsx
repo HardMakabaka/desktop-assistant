@@ -200,7 +200,7 @@ export function MainPanel() {
   const getDesktopAPI = () => {
     const api = window.desktopAPI;
     if (!api) {
-      throw new Error('桌面桥接未初始化，请通过 Electron 启动应用并重试');
+      throw new Error('桌面桥接未初始化，请通过 Tauri 启动应用并重试');
     }
     return api;
   };
