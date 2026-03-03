@@ -1,0 +1,19 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "rightcode": {
+      "models": {
+        "gpt-5.3-codex": {
+          "options": {
+            "promptCacheKey": "opencode-desktop-assistant"
+          }
+        },
+        "gpt-5.2": {
+          "options": {
+            "promptCacheKey": "opencode-desktop-assistant"
+          }
+        }
+      }
+    }
+  }
+}
