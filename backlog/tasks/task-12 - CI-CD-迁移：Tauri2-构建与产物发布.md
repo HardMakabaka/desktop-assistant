@@ -24,6 +24,6 @@ priority: high
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 PR/push CI 跑类型检查+前端构建+tauri build smoke
-- [ ] #2 tag 发布产出 deb/rpm 与 windows 安装包
+- [ ] #2 tag 发布产出 deb/rpm 与 Windows exe 安装包
 - [ ] #3 失败日志可定位 Rust/toolchain/系统依赖问题
 <!-- AC:END -->
