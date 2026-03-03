@@ -3,13 +3,13 @@ name: Build & Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  release-windows:
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -32,13 +32,10 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build
-        run: npm run build
+      - name: Package & Publish (Windows)
+        run: npm run pack:win -- --publish always
 
-      - name: Package & Publish
-        run: npx electron-builder --win --x64 --publish always
-
-      - name: Upload workflow artifacts
+      - name: Upload workflow artifacts (Windows)
         uses: actions/upload-artifact@v4
         with:
           name: windows-release-assets
@@ -46,4 +43,45 @@ jobs:
             release/*.exe
             release/*.yml
             release/*.blockmap
+          if-no-files-found: error
+
+  release-linux:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Linux packaging dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Package & Publish (Linux)
+        run: npm run pack:linux -- --publish always
+
+      - name: Upload workflow artifacts (Linux)
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-assets
+          path: |
+            release/*.deb
+            release/*.rpm
+            release/*.yml
           if-no-files-found: error
