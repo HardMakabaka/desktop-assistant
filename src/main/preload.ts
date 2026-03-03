@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { StickyNote, CalendarMark, UpdateCheckResponse, CalendarAppearance } from '../shared/types';
+import type { StickyNote, CalendarMark, UpdateCheckResponse, CalendarAppearance, StartupLaunchStatus } from '../shared/types';
 
 const IPC_CHANNELS = {
   NOTE_GET_ALL: 'note:get-all',
@@ -16,6 +16,8 @@ const IPC_CHANNELS = {
   WINDOW_OPEN_NOTE: 'window:open-note',
   WINDOW_OPEN_CALENDAR: 'window:open-calendar',
   UPDATE_CHECK: 'update:check',
+  STARTUP_GET_STATUS: 'startup:get-status',
+  STARTUP_SET_ENABLED: 'startup:set-enabled',
 } as const;
 
 const api = {
@@ -45,6 +47,10 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_NOTE, noteId),
   openCalendar: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_CALENDAR),
   checkForUpdates: (): Promise<UpdateCheckResponse> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
+  getStartupLaunchStatus: (): Promise<StartupLaunchStatus> =>
+    ipcRenderer.invoke(IPC_CHANNELS.STARTUP_GET_STATUS),
+  setStartupLaunchEnabled: (enabled: boolean): Promise<StartupLaunchStatus> =>
+    ipcRenderer.invoke(IPC_CHANNELS.STARTUP_SET_ENABLED, enabled),
 };
 
 try {

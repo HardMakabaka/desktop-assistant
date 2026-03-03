@@ -1,10 +1,10 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, NativeImage } from 'electron';
 import * as path from 'path';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { pathToFileURL } from 'url';
 import { autoUpdater } from 'electron-updater';
 import { StoreManager } from './store';
-import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse, CalendarAppearance } from '../shared/types';
+import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse, CalendarAppearance, StartupLaunchStatus } from '../shared/types';
 
 const devServerURL = process.env.DESKTOP_ASSISTANT_DEV_URL || process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(devServerURL);
@@ -39,6 +39,60 @@ function createTrayIcon(): NativeImage {
 
   const traySize = process.platform === 'linux' ? 22 : 16;
   return icon.resize({ width: traySize, height: traySize });
+}
+
+const AUTOSTART_FILE_NAME = 'desktop-assistant.desktop';
+
+function isLinuxStartupSupported(): boolean {
+  return process.platform === 'linux' && app.isPackaged;
+}
+
+function getLinuxAutostartFilePath(): string {
+  const configHome = process.env.XDG_CONFIG_HOME || path.join(app.getPath('home'), '.config');
+  return path.join(configHome, 'autostart', AUTOSTART_FILE_NAME);
+}
+
+function getLinuxAutostartEntryContent(): string {
+  return [
+    '[Desktop Entry]',
+    'Type=Application',
+    'Version=1.0',
+    'Name=桌面助手',
+    'Comment=Desktop sticky notes and calendar widget',
+    `Exec=${process.execPath}`,
+    'Icon=desktop-assistant',
+    'Terminal=false',
+    'StartupNotify=false',
+    'X-GNOME-Autostart-enabled=true',
+  ].join('\n');
+}
+
+function getStartupLaunchStatus(): StartupLaunchStatus {
+  if (!isLinuxStartupSupported()) {
+    return { supported: false, enabled: false };
+  }
+
+  return {
+    supported: true,
+    enabled: existsSync(getLinuxAutostartFilePath()),
+  };
+}
+
+function setStartupLaunchEnabled(enabled: boolean): StartupLaunchStatus {
+  if (!isLinuxStartupSupported()) {
+    return { supported: false, enabled: false };
+  }
+
+  const filePath = getLinuxAutostartFilePath();
+
+  if (enabled) {
+    mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFileSync(filePath, `${getLinuxAutostartEntryContent()}\n`, 'utf8');
+  } else if (existsSync(filePath)) {
+    rmSync(filePath, { force: true });
+  }
+
+  return getStartupLaunchStatus();
 }
 
 function getRendererURL(page: string): string {
@@ -390,6 +444,14 @@ function setupIPC(): void {
 
   ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, async () => {
     return checkForUpdatesManually();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.STARTUP_GET_STATUS, () => {
+    return getStartupLaunchStatus();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.STARTUP_SET_ENABLED, (_event, enabled: boolean) => {
+    return setStartupLaunchEnabled(Boolean(enabled));
   });
 }
 

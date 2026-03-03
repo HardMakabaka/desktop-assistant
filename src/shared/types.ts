@@ -30,6 +30,11 @@ export interface UpdateCheckResponse {
   message: string;
 }
 
+export interface StartupLaunchStatus {
+  supported: boolean;
+  enabled: boolean;
+}
+
 /** IPC 频道 */
 export const IPC_CHANNELS = {
   // 便签
@@ -49,4 +54,6 @@ export const IPC_CHANNELS = {
   WINDOW_OPEN_NOTE: 'window:open-note',
   WINDOW_OPEN_CALENDAR: 'window:open-calendar',
   UPDATE_CHECK: 'update:check',
+  STARTUP_GET_STATUS: 'startup:get-status',
+  STARTUP_SET_ENABLED: 'startup:set-enabled',
 } as const;

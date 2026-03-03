@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import type { StickyNote } from '../../shared/types';
+import type { StickyNote, StartupLaunchStatus } from '../../shared/types';
 
 const styles = {
   container: {
@@ -42,7 +42,7 @@ const styles = {
     position: 'absolute' as const,
     top: '34px',
     right: 0,
-    minWidth: '138px',
+    minWidth: '190px',
     background: 'rgba(23,25,35,0.95)',
     border: '1px solid rgba(255,255,255,0.18)',
     borderRadius: '10px',
@@ -194,6 +194,7 @@ export function MainPanel() {
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [startupStatus, setStartupStatus] = useState<StartupLaunchStatus | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
   const getDesktopAPI = () => {
@@ -223,8 +224,18 @@ export function MainPanel() {
     }, '加载便签失败');
   };
 
+  const loadStartupStatus = async () => {
+    try {
+      const status = await getDesktopAPI().getStartupLaunchStatus();
+      setStartupStatus(status);
+    } catch {
+      setStartupStatus(null);
+    }
+  };
+
   useEffect(() => {
-    loadNotes();
+    void loadNotes();
+    void loadStartupStatus();
   }, []);
 
   useEffect(() => {
@@ -275,6 +286,28 @@ export function MainPanel() {
     }, '关闭窗口失败');
   };
 
+  const handleToggleStartup = async () => {
+    setShowSettingsMenu(false);
+    setActionError('');
+    setActionSuccess('');
+
+    try {
+      const current = startupStatus || await getDesktopAPI().getStartupLaunchStatus();
+
+      if (!current.supported) {
+        setActionError('当前平台或运行模式不支持开机启动设置');
+        return;
+      }
+
+      const next = await getDesktopAPI().setStartupLaunchEnabled(!current.enabled);
+      setStartupStatus(next);
+      setActionSuccess(next.enabled ? '已开启开机启动' : '已关闭开机启动');
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : '设置开机启动失败';
+      setActionError(detail);
+    }
+  };
+
   const handleCheckUpdates = async () => {
     setShowSettingsMenu(false);
     setActionError('');
@@ -311,6 +344,15 @@ export function MainPanel() {
             </button>
             {showSettingsMenu ? (
               <div style={styles.settingsMenu}>
+                <button
+                  style={styles.settingsItem}
+                  onClick={handleToggleStartup}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  aria-label="切换开机启动"
+                >
+                  开机启动：{startupStatus?.supported ? (startupStatus.enabled ? '已开启' : '已关闭') : '不支持'}
+                </button>
                 <button
                   style={styles.settingsItem}
                   onClick={handleCheckUpdates}
