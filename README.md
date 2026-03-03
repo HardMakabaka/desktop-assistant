@@ -77,6 +77,7 @@ sudo dnf upgrade desktop-assistant
 
 - 开启后会写入 `~/.config/autostart/desktop-assistant.desktop`
 - 关闭后会删除该文件
+- 生成的 desktop entry 包含 `Exec/TryExec/X-GNOME-Autostart-enabled/X-KDE-autostart-after`，兼容 Ubuntu GNOME 与 CentOS 常见桌面环境的 Autostart 识别
 
 > 该开关在 Linux 打包版中可用（开发模式下不启用）
 

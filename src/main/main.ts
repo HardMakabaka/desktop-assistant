@@ -52,18 +52,37 @@ function getLinuxAutostartFilePath(): string {
   return path.join(configHome, 'autostart', AUTOSTART_FILE_NAME);
 }
 
+function formatDesktopExecPath(execPath: string): string {
+  if (!/\s/.test(execPath)) {
+    return execPath;
+  }
+
+  const escaped = execPath
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"');
+
+  return `"${escaped}"`;
+}
+
 function getLinuxAutostartEntryContent(): string {
+  const execPath = formatDesktopExecPath(process.execPath);
+
   return [
     '[Desktop Entry]',
     'Type=Application',
     'Version=1.0',
     'Name=桌面助手',
     'Comment=Desktop sticky notes and calendar widget',
-    `Exec=${process.execPath}`,
+    `Exec=${execPath}`,
+    `TryExec=${execPath}`,
     'Icon=desktop-assistant',
     'Terminal=false',
     'StartupNotify=false',
+    'Hidden=false',
+    'NoDisplay=false',
+    'Categories=Utility;',
     'X-GNOME-Autostart-enabled=true',
+    'X-KDE-autostart-after=panel',
   ].join('\n');
 }
 
