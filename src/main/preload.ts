@@ -3,8 +3,11 @@ import type { StickyNote, CalendarMark, UpdateCheckResponse, CalendarAppearance,
 
 const IPC_CHANNELS = {
   NOTE_GET_ALL: 'note:get-all',
+  NOTE_GET_TRASH: 'note:get-trash',
   NOTE_SAVE: 'note:save',
   NOTE_DELETE: 'note:delete',
+  NOTE_RESTORE: 'note:restore',
+  NOTE_DELETE_PERMANENT: 'note:delete-permanent',
   NOTE_CREATE: 'note:create',
   CALENDAR_GET_MARKS: 'calendar:get-marks',
   CALENDAR_SAVE_MARK: 'calendar:save-mark',
@@ -23,10 +26,14 @@ const IPC_CHANNELS = {
 const api = {
   // 便签
   getNotes: (): Promise<StickyNote[]> => ipcRenderer.invoke(IPC_CHANNELS.NOTE_GET_ALL),
+  getTrashNotes: (): Promise<StickyNote[]> => ipcRenderer.invoke(IPC_CHANNELS.NOTE_GET_TRASH),
   createNote: (): Promise<StickyNote> => ipcRenderer.invoke(IPC_CHANNELS.NOTE_CREATE),
   saveNote: (note: Partial<StickyNote> & { id: string }): Promise<boolean> =>
     ipcRenderer.invoke(IPC_CHANNELS.NOTE_SAVE, note),
   deleteNote: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.NOTE_DELETE, id),
+  restoreNote: (id: string): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.NOTE_RESTORE, id),
+  permanentlyDeleteNote: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.NOTE_DELETE_PERMANENT, id),
 
   // 日历
   getMarks: (): Promise<CalendarMark[]> => ipcRenderer.invoke(IPC_CHANNELS.CALENDAR_GET_MARKS),

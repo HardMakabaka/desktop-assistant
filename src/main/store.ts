@@ -1,5 +1,5 @@
 import Store from 'electron-store';
-import { StickyNote, CalendarMark, CalendarAppearance } from '../shared/types';
+import { StickyNote, StickyNoteStatus, CalendarMark, CalendarAppearance } from '../shared/types';
 
 interface StoreSchema {
   notes: StickyNote[];
@@ -14,9 +14,26 @@ const DEFAULT_CALENDAR_APPEARANCE: CalendarAppearance = {
   opacity: 0.94,
 };
 
+const ACTIVE_STATUS: StickyNoteStatus = 'active';
+const TRASH_STATUS: StickyNoteStatus = 'trash';
+
 function clampOpacity(value: number): number {
   if (Number.isNaN(value)) return DEFAULT_NOTE_OPACITY;
   return Math.min(1, Math.max(0.2, value));
+}
+
+function normalizeStatus(status?: StickyNoteStatus): StickyNoteStatus {
+  return status === TRASH_STATUS ? TRASH_STATUS : ACTIVE_STATUS;
+}
+
+function normalizeNote(note: StickyNote): StickyNote {
+  const status = normalizeStatus(note.status);
+  return {
+    ...note,
+    status,
+    opacity: clampOpacity(note.opacity ?? DEFAULT_NOTE_OPACITY),
+    deletedAt: status === TRASH_STATUS ? note.deletedAt : undefined,
+  };
 }
 
 export class StoreManager {
@@ -33,12 +50,17 @@ export class StoreManager {
   }
 
   // ---- 便签 ----
-  getAllNotes(): StickyNote[] {
+  private getStoredNotes(): StickyNote[] {
     const notes = this.store.get('notes', []);
-    return notes.map(note => ({
-      ...note,
-      opacity: clampOpacity(note.opacity ?? DEFAULT_NOTE_OPACITY),
-    }));
+    return notes.map(normalizeNote);
+  }
+
+  getAllNotes(): StickyNote[] {
+    return this.getStoredNotes().filter(note => note.status !== TRASH_STATUS);
+  }
+
+  getTrashNotes(): StickyNote[] {
+    return this.getStoredNotes().filter(note => note.status === TRASH_STATUS);
   }
 
   createNote(): StickyNote {
@@ -53,31 +75,75 @@ export class StoreManager {
       width: 260,
       height: 280,
       pinned: false,
+      status: ACTIVE_STATUS,
+      deletedAt: undefined,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
-    notes.push(note);
-    this.store.set('notes', notes);
+    const allNotes = this.getStoredNotes();
+    allNotes.push(note);
+    this.store.set('notes', allNotes);
     return note;
   }
 
   updateNote(id: string, updates: Partial<StickyNote>): void {
-    const notes = this.getAllNotes();
+    const notes = this.getStoredNotes();
     const idx = notes.findIndex(n => n.id === id);
     if (idx !== -1) {
-      notes[idx] = {
+      const next = normalizeNote({
         ...notes[idx],
         ...updates,
         opacity: clampOpacity(updates.opacity ?? notes[idx].opacity),
         updatedAt: Date.now(),
-      };
+      });
+      notes[idx] = next;
       this.store.set('notes', notes);
     }
   }
 
   deleteNote(id: string): void {
-    const notes = this.getAllNotes().filter(n => n.id !== id);
+    this.moveNoteToTrash(id);
+  }
+
+  moveNoteToTrash(id: string): boolean {
+    const notes = this.getStoredNotes();
+    const idx = notes.findIndex(n => n.id === id);
+    if (idx === -1) return false;
+    if (notes[idx].status === TRASH_STATUS) return true;
+
+    notes[idx] = {
+      ...notes[idx],
+      status: TRASH_STATUS,
+      deletedAt: Date.now(),
+      updatedAt: Date.now(),
+    };
     this.store.set('notes', notes);
+    return true;
+  }
+
+  restoreNote(id: string): boolean {
+    const notes = this.getStoredNotes();
+    const idx = notes.findIndex(n => n.id === id && n.status === TRASH_STATUS);
+    if (idx === -1) return false;
+
+    notes[idx] = {
+      ...notes[idx],
+      status: ACTIVE_STATUS,
+      deletedAt: undefined,
+      updatedAt: Date.now(),
+    };
+    this.store.set('notes', notes);
+    return true;
+  }
+
+  permanentlyDeleteNote(id: string): boolean {
+    const notes = this.getStoredNotes();
+    const target = notes.find(n => n.id === id);
+    if (!target || target.status !== TRASH_STATUS) return false;
+
+    const next = notes.filter(n => n.id !== id);
+    this.store.set('notes', next);
+    return true;
   }
 
   // ---- 日历标记 ----

@@ -1,4 +1,6 @@
 /** 便签数据 */
+export type StickyNoteStatus = 'active' | 'trash';
+
 export interface StickyNote {
   id: string;
   content: string;
@@ -9,6 +11,8 @@ export interface StickyNote {
   width: number;
   height: number;
   pinned: boolean;
+  status?: StickyNoteStatus;
+  deletedAt?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -39,8 +43,11 @@ export interface StartupLaunchStatus {
 export const IPC_CHANNELS = {
   // 便签
   NOTE_GET_ALL: 'note:get-all',
+  NOTE_GET_TRASH: 'note:get-trash',
   NOTE_SAVE: 'note:save',
   NOTE_DELETE: 'note:delete',
+  NOTE_RESTORE: 'note:restore',
+  NOTE_DELETE_PERMANENT: 'note:delete-permanent',
   NOTE_CREATE: 'note:create',
   // 日历
   CALENDAR_GET_MARKS: 'calendar:get-marks',

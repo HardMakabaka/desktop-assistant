@@ -9,9 +9,12 @@ import type {
 
 export interface DesktopAPI {
   getNotes: () => Promise<StickyNote[]>;
+  getTrashNotes: () => Promise<StickyNote[]>;
   createNote: () => Promise<StickyNote>;
   saveNote: (note: Partial<StickyNote> & { id: string }) => Promise<boolean>;
   deleteNote: (id: string) => Promise<boolean>;
+  restoreNote: (id: string) => Promise<boolean>;
+  permanentlyDeleteNote: (id: string) => Promise<boolean>;
   getMarks: () => Promise<CalendarMark[]>;
   saveMark: (mark: CalendarMark) => Promise<boolean>;
   deleteMark: (date: string) => Promise<boolean>;
@@ -28,9 +31,12 @@ export interface DesktopAPI {
 
 const desktopAPI: DesktopAPI = {
   getNotes: () => invoke('get_notes'),
+  getTrashNotes: () => invoke('get_trash_notes'),
   createNote: () => invoke('create_note'),
   saveNote: note => invoke('save_note', { note }),
   deleteNote: id => invoke('delete_note', { id }),
+  restoreNote: id => invoke('restore_note', { id }),
+  permanentlyDeleteNote: id => invoke('permanently_delete_note', { id }),
   getMarks: () => invoke('get_marks'),
   saveMark: mark => invoke('save_mark', { mark }),
   deleteMark: date => invoke('delete_mark', { date }),

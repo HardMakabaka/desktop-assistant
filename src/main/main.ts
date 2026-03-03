@@ -393,6 +393,10 @@ function setupIPC(): void {
     return store.getAllNotes();
   });
 
+  ipcMain.handle(IPC_CHANNELS.NOTE_GET_TRASH, () => {
+    return store.getTrashNotes();
+  });
+
   ipcMain.handle(IPC_CHANNELS.NOTE_CREATE, () => {
     return handleCreateNote();
   });
@@ -403,7 +407,21 @@ function setupIPC(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.NOTE_DELETE, (_event, id: string) => {
-    store.deleteNote(id);
+    const moved = store.moveNoteToTrash(id);
+    if (!moved) return false;
+    const win = noteWindows.get(id);
+    if (win && !win.isDestroyed()) win.close();
+    noteWindows.delete(id);
+    return true;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.NOTE_RESTORE, (_event, id: string) => {
+    return store.restoreNote(id);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.NOTE_DELETE_PERMANENT, (_event, id: string) => {
+    const deleted = store.permanentlyDeleteNote(id);
+    if (!deleted) return false;
     const win = noteWindows.get(id);
     if (win && !win.isDestroyed()) win.close();
     noteWindows.delete(id);
