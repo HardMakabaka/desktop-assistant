@@ -56,7 +56,7 @@ jobs:
         run: npm run tauri -- info
 
       - name: Tauri build smoke (no bundle)
-        run: npm run tauri -- build --bundles none
+        run: npm run tauri -- build --no-bundle
 
       - name: Diagnostics on failure
         if: failure()
