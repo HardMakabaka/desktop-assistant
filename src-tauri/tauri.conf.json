@@ -16,7 +16,8 @@
         "title": "桌面助手",
         "width": 480,
         "height": 600,
-        "resizable": true
+        "resizable": true,
+        "decorations": false
       }
     ],
     "security": {
