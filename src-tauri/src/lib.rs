@@ -419,7 +419,7 @@ fn close_window(window: Window) -> Result<bool, String> {
     Ok(true)
 }
 
-fn focus_existing_window(window: &Window) -> Result<(), String> {
+fn focus_existing_window(window: &tauri::WebviewWindow) -> Result<(), String> {
     if window.is_minimized().unwrap_or(false) {
         window.unminimize().map_err(|e| e.to_string())?;
     }
