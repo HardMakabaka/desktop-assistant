@@ -428,47 +428,65 @@ fn focus_existing_window(window: &tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
-fn open_window(app: &AppHandle, label: &str, title: &str, url: WebviewUrl) -> Result<(), String> {
+fn open_window(
+    app: &AppHandle,
+    label: &str,
+    title: &str,
+    url: WebviewUrl,
+) -> Result<tauri::WebviewWindow, String> {
     if let Some(window) = app.get_webview_window(label) {
         focus_existing_window(&window)?;
-        return Ok(());
+        return Ok(window);
     }
 
-    WebviewWindowBuilder::new(app, label, url)
+    let window = WebviewWindowBuilder::new(app, label, url)
         .title(title)
         .inner_size(480.0, 620.0)
         .resizable(true)
         .build()
+        .map_err(|e| e.to_string())?;
+
+    // Ensure newly created windows are actually visible/focused on Windows.
+    focus_existing_window(&window)?;
+    Ok(window)
+}
+
+fn set_window_location(window: &tauri::WebviewWindow, location: &str) -> Result<(), String> {
+    window
+        .eval(&format!(
+            "window.location.replace({});",
+            serde_json::to_string(location).map_err(|e| e.to_string())?
+        ))
         .map_err(|e| e.to_string())?;
     Ok(())
 }
 
 #[tauri::command]
 fn open_note(app: AppHandle, note_id: Option<String>) -> Result<bool, String> {
-    let mut path = String::from("note.html");
+    let mut location = String::from("note.html");
     if let Some(id) = note_id.as_deref().filter(|id| !id.is_empty()) {
-        path.push_str("?id=");
-        path.push_str(id);
+        location.push_str("?id=");
+        location.push_str(id);
     }
 
     if let Some(window) = app.get_webview_window("note") {
-        window
-            .eval(&format!(
-                "window.location.replace({});",
-                serde_json::to_string(&path).map_err(|e| e.to_string())?
-            ))
-            .map_err(|e| e.to_string())?;
+        set_window_location(&window, &location)?;
         focus_existing_window(&window)?;
         return Ok(true);
     }
 
-    open_window(&app, "note", "便签", WebviewUrl::App(path.into()))?;
+    // WebviewUrl::App ultimately becomes a PathBuf; `?` in the path breaks on Windows.
+    let window = open_window(&app, "note", "便签", WebviewUrl::App("note.html".into()))?;
+    if location != "note.html" {
+        set_window_location(&window, &location)?;
+    }
+
     Ok(true)
 }
 
 #[tauri::command]
 fn open_calendar(app: AppHandle) -> Result<bool, String> {
-    open_window(&app, "calendar", "日历", WebviewUrl::App("calendar.html".into()))?;
+    let _ = open_window(&app, "calendar", "日历", WebviewUrl::App("calendar.html".into()))?;
     Ok(true)
 }
 

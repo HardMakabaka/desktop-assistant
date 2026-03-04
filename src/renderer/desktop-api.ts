@@ -47,7 +47,8 @@ const desktopAPI: DesktopAPI = {
   saveCalendarAppearance: appearance => invoke('save_calendar_appearance', { appearance }),
   pinWindow: pinned => invoke('pin_window', { pinned }),
   closeWindow: () => invoke('close_window'),
-  openNote: noteId => invoke('open_note', { noteId }),
+  // Note: Tauri command arg names follow Rust identifiers; `open_note` expects `note_id`.
+  openNote: noteId => invoke('open_note', { note_id: noteId }),
   openCalendar: () => invoke('open_calendar'),
   checkForUpdates: () => invoke('check_for_updates'),
   getStartupLaunchStatus: () => invoke('get_startup_launch_status'),
