@@ -1,6 +1,6 @@
 [package]
 name = "desktop-assistant"
-version = "1.0.4"
+version = "1.0.5"
 description = "桌面助手 - 便签与日历桌面小工具"
 authors = ["HardMakabaka <hardmakabaka@users.noreply.github.com>"]
 edition = "2021"
