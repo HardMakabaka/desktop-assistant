@@ -286,8 +286,9 @@ export function MainPanel() {
 
   const handleNewNote = async () => {
     await runAction(async () => {
-      await getDesktopAPI().createNote();
+      const note = await getDesktopAPI().createNote();
       await refreshNotes();
+      await getDesktopAPI().openNote(note.id);
     }, '新建便签失败');
   };
 

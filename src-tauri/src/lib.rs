@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tauri::{Manager, State, Window};
+use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder, Window};
 
 const NOTE_COLORS: [&str; 6] = ["#fff9c4", "#c8e6c9", "#bbdefb", "#f8bbd0", "#e1bee7", "#ffe0b2"];
 const DEFAULT_NOTE_OPACITY: f64 = 0.92;
@@ -12,6 +12,7 @@ const SHORTCUT_ACTIONS: [(&str, &str); 3] = [
     ("insertBullet", "Ctrl+Alt+L"),
     ("insertQuote", "Ctrl+Alt+Q"),
 ];
+const RELEASES_URL: &str = "https://github.com/HardMakabaka/desktop-assistant/releases/latest";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -418,21 +419,70 @@ fn close_window(window: Window) -> Result<bool, String> {
     Ok(true)
 }
 
-#[tauri::command]
-fn open_note() -> bool {
-    true
+fn focus_existing_window(window: &Window) -> Result<(), String> {
+    if window.is_minimized().unwrap_or(false) {
+        window.unminimize().map_err(|e| e.to_string())?;
+    }
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn open_window(app: &AppHandle, label: &str, title: &str, url: WebviewUrl) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(label) {
+        focus_existing_window(&window)?;
+        return Ok(());
+    }
+
+    WebviewWindowBuilder::new(app, label, url)
+        .title(title)
+        .inner_size(480.0, 620.0)
+        .resizable(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
-fn open_calendar() -> bool {
-    true
+fn open_note(app: AppHandle, note_id: Option<String>) -> Result<bool, String> {
+    let mut path = String::from("note.html");
+    if let Some(id) = note_id.as_deref().filter(|id| !id.is_empty()) {
+        path.push_str("?id=");
+        path.push_str(id);
+    }
+
+    if let Some(window) = app.get_webview_window("note") {
+        window
+            .eval(&format!(
+                "window.location.replace({});",
+                serde_json::to_string(&path).map_err(|e| e.to_string())?
+            ))
+            .map_err(|e| e.to_string())?;
+        focus_existing_window(&window)?;
+        return Ok(true);
+    }
+
+    open_window(&app, "note", "便签", WebviewUrl::App(path.into()))?;
+    Ok(true)
+}
+
+#[tauri::command]
+fn open_calendar(app: AppHandle) -> Result<bool, String> {
+    open_window(&app, "calendar", "日历", WebviewUrl::App("calendar.html".into()))?;
+    Ok(true)
 }
 
 #[tauri::command]
 fn check_for_updates() -> UpdateCheckResponse {
-    UpdateCheckResponse {
-        ok: true,
-        message: "Tauri 迁移阶段暂未启用内置更新。".to_string(),
+    match webbrowser::open(RELEASES_URL) {
+        Ok(_) => UpdateCheckResponse {
+            ok: true,
+            message: "已打开最新版本下载页，请下载并安装更新包。".to_string(),
+        },
+        Err(error) => UpdateCheckResponse {
+            ok: false,
+            message: format!("打开更新页面失败：{}", error),
+        },
     }
 }
 
