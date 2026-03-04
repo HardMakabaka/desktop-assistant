@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { CalendarMark, CalendarAppearance } from '../../shared/types';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
@@ -213,6 +215,12 @@ export function CalendarWindow() {
   }, []);
 
   useEffect(() => {
+    if (isTauri() && /Windows/i.test(navigator.userAgent)) {
+      const win = getCurrentWindow();
+      win.setDecorations(false).catch(() => {});
+      win.setShadow(true).catch(() => {});
+    }
+
     loadMarks();
   }, [loadMarks]);
 
@@ -247,7 +255,9 @@ export function CalendarWindow() {
     await window.desktopAPI.pinWindow(newPinned);
   };
 
-  const handleClose = () => window.desktopAPI.closeWindow();
+  const handleClose = () => {
+    void getCurrentWindow().close();
+  };
 
   const handleDayClick = (day: number) => {
     const date = formatDate(year, month, day);
@@ -308,7 +318,7 @@ export function CalendarWindow() {
 
   return (
     <div style={{ ...styles.container, background: toRgba(appearance.color, normalizedOpacity) }}>
-      <div style={styles.header}>
+      <div style={styles.header} data-tauri-drag-region>
         <div style={styles.headerActions}>
           <button
             style={styles.navBtn}
@@ -333,6 +343,7 @@ export function CalendarWindow() {
         <div style={styles.headerActions}>
           <button
             style={{ ...styles.iconBtn, color: pinned ? '#ffeb3b' : '#fff' }}
+            data-tauri-drag-region="false"
             onClick={handlePin}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -343,6 +354,7 @@ export function CalendarWindow() {
           </button>
           <button
             style={styles.iconBtn}
+            data-tauri-drag-region="false"
             onClick={handleClose}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

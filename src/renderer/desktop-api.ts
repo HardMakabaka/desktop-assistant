@@ -11,6 +11,8 @@ import type {
 export interface DesktopAPI {
   getNotes: () => Promise<StickyNote[]>;
   getTrashNotes: () => Promise<StickyNote[]>;
+  getNoteById: (id: string) => Promise<StickyNote | null>;
+  consumePendingNoteId: () => Promise<string | null>;
   createNote: () => Promise<StickyNote>;
   saveNote: (note: Partial<StickyNote> & { id: string }) => Promise<boolean>;
   deleteNote: (id: string) => Promise<boolean>;
@@ -35,6 +37,8 @@ export interface DesktopAPI {
 const desktopAPI: DesktopAPI = {
   getNotes: () => invoke('get_notes'),
   getTrashNotes: () => invoke('get_trash_notes'),
+  getNoteById: id => invoke('get_note_by_id', { id }),
+  consumePendingNoteId: () => invoke('consume_pending_note_id'),
   createNote: () => invoke('create_note'),
   saveNote: note => invoke('save_note', { note }),
   deleteNote: id => invoke('delete_note', { id }),

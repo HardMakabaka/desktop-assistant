@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { StickyNote, StartupLaunchStatus } from '../../shared/types';
 
 const styles = {
@@ -265,6 +267,12 @@ export function MainPanel() {
   };
 
   useEffect(() => {
+    if (isTauri() && /Windows/i.test(navigator.userAgent)) {
+      const win = getCurrentWindow();
+      win.setDecorations(false).catch(() => {});
+      win.setShadow(true).catch(() => {});
+    }
+
     void refreshNotes();
     void loadStartupStatus();
   }, []);
@@ -340,7 +348,10 @@ export function MainPanel() {
 
   const handleClose = async () => {
     await runAction(async () => {
-      await getDesktopAPI().closeWindow();
+      if (!isTauri()) {
+        throw new Error('当前不是桌面运行环境，无法关闭窗口');
+      }
+      await getCurrentWindow().close();
     }, '关闭窗口失败');
   };
 
@@ -387,12 +398,13 @@ export function MainPanel() {
 
   return (
     <div style={styles.container}>
-      <div style={styles.titleBar}>
+      <div style={styles.titleBar} data-tauri-drag-region>
         <span style={styles.title}>桌面助手</span>
         <div style={styles.titleActions}>
           <div style={styles.settingsWrap} ref={settingsRef}>
             <button
               style={styles.iconBtn}
+              data-tauri-drag-region="false"
               onClick={() => setShowSettingsMenu(prev => !prev)}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -425,6 +437,7 @@ export function MainPanel() {
           </div>
           <button
             style={styles.closeBtn}
+            data-tauri-drag-region="false"
             onClick={handleClose}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

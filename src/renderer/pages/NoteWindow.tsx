@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { isTauri } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { createWorker } from 'tesseract.js';
 import type { StickyNote, TextShortcut } from '../../shared/types';
 
@@ -593,6 +595,8 @@ async function recognizeTextFromImage(blob: Blob): Promise<string> {
 
 export function NoteWindow() {
   const [note, setNote] = useState<StickyNote | null>(null);
+  const [loadState, setLoadState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [pinned, setPinned] = useState(false);
   const [editorMode, setEditorMode] = useState<'preview' | 'source'>('preview');
   const [ocrError, setOcrError] = useState<string | null>(null);
@@ -610,18 +614,38 @@ export function NoteWindow() {
     return renderMarkdownToHtml(note?.content ?? '');
   }, [note?.content]);
 
-  // 从 URL 获取便签 ID
-  const noteId = new URLSearchParams(window.location.search).get('id');
+  // Prefer URL id, but fall back to a backend-provided pending id (Windows new-window navigation is racy).
+  const noteIdFromUrl = new URLSearchParams(window.location.search).get('id');
 
   const loadNote = useCallback(async () => {
-    if (!noteId) return;
-    const notes = await window.desktopAPI.getNotes();
-    const found = notes.find(n => n.id === noteId);
-    if (found) {
+    setLoadState('loading');
+    setLoadError(null);
+
+    try {
+      const id = noteIdFromUrl || await window.desktopAPI.consumePendingNoteId();
+
+      if (!id) {
+        setLoadState('error');
+        setLoadError('未获取到便签 ID');
+        return;
+      }
+
+      const found = await window.desktopAPI.getNoteById(id);
+      if (!found) {
+        setLoadState('error');
+        setLoadError('便签不存在或已被删除');
+        return;
+      }
+
       setNote(found);
       setPinned(found.pinned);
+      setLoadState('ready');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '加载便签失败';
+      setLoadState('error');
+      setLoadError(message);
     }
-  }, [noteId]);
+  }, [noteIdFromUrl]);
 
   const loadTextShortcuts = useCallback(async () => {
     try {
@@ -633,6 +657,12 @@ export function NoteWindow() {
   }, []);
 
   useEffect(() => {
+    if (isTauri() && /Windows/i.test(navigator.userAgent)) {
+      const win = getCurrentWindow();
+      win.setDecorations(false).catch(() => {});
+      win.setShadow(true).catch(() => {});
+    }
+
     loadNote();
     loadTextShortcuts();
   }, [loadNote, loadTextShortcuts]);
@@ -726,11 +756,11 @@ export function NoteWindow() {
   const handleMoveToTrash = async () => {
     if (!note) return;
     await window.desktopAPI.deleteNote(note.id);
-    await window.desktopAPI.closeWindow();
+    await getCurrentWindow().close();
   };
 
   const handleClose = () => {
-    window.desktopAPI.closeWindow();
+    void getCurrentWindow().close();
   };
 
   const handleColorChange = (color: string) => {
@@ -827,7 +857,30 @@ export function NoteWindow() {
     }
   };
 
-  if (!note) return null;
+  if (!note) {
+    return (
+      <div style={{ ...styles.container, background: 'rgba(255,255,255,0.92)' }}>
+        <div style={{ ...styles.header, background: 'rgba(245,245,245,0.98)' }} data-tauri-drag-region>
+          <div style={styles.headerActions}>
+            <button
+              style={{ ...styles.iconBtn, color: 'rgba(0,0,0,0.55)' }}
+              data-tauri-drag-region="false"
+              onClick={() => void getCurrentWindow().close()}
+              aria-label="关闭窗口"
+              title="关闭"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        <div style={{ padding: '18px 14px', color: 'rgba(0,0,0,0.72)', fontSize: '13px' }}>
+          {loadState === 'loading' ? '正在加载便签…' : null}
+          {loadState === 'error' ? `加载失败：${loadError || '未知错误'}` : null}
+          {loadState === 'idle' ? '初始化中…' : null}
+        </div>
+      </div>
+    );
+  }
 
   const darkenColor = (hex: string, amount: number): string => {
     const num = parseInt(hex.replace('#', ''), 16);
@@ -853,13 +906,17 @@ export function NoteWindow() {
 
   return (
     <div style={{ ...styles.container, background: toRgba(note.color, normalizedOpacity) }}>
-      <div style={{ ...styles.header, background: toRgba(headerBg, Math.min(1, normalizedOpacity + 0.06)) }}>
+      <div
+        style={{ ...styles.header, background: toRgba(headerBg, Math.min(1, normalizedOpacity + 0.06)) }}
+        data-tauri-drag-region
+      >
         <div style={styles.headerActions}>
           <button
             style={{
               ...styles.iconBtn,
               color: pinned ? '#e53935' : 'rgba(0,0,0,0.5)',
             }}
+            data-tauri-drag-region="false"
             onClick={handlePin}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -912,6 +969,7 @@ export function NoteWindow() {
           </button>
           <button
             style={styles.iconBtn}
+            data-tauri-drag-region="false"
             onClick={handleStartOcrCapture}
             onMouseEnter={e => {
               e.currentTarget.style.background = 'rgba(33,150,243,0.2)';
@@ -929,6 +987,7 @@ export function NoteWindow() {
           </button>
           <button
             style={styles.iconBtn}
+            data-tauri-drag-region="false"
             onClick={handleMoveToTrash}
             onMouseEnter={e => {
               e.currentTarget.style.background = 'rgba(255,152,0,0.18)';
@@ -945,6 +1004,7 @@ export function NoteWindow() {
           </button>
           <button
             style={styles.iconBtn}
+            data-tauri-drag-region="false"
             onClick={handleClose}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}

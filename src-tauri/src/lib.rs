@@ -117,6 +117,7 @@ struct PersistedStore {
 struct AppState {
     store_path: PathBuf,
     store: Mutex<PersistedStore>,
+    pending_note_id: Mutex<Option<String>>,
 }
 
 fn now_ts() -> i64 {
@@ -201,6 +202,25 @@ fn get_notes(state: State<'_, AppState>) -> Result<Vec<StickyNote>, String> {
         .filter(|note| !is_trash_note(note))
         .cloned()
         .collect())
+}
+
+#[tauri::command]
+fn get_note_by_id(state: State<'_, AppState>, id: String) -> Result<Option<StickyNote>, String> {
+    let store = state.store.lock().map_err(|_| "store lock poisoned".to_string())?;
+    Ok(store
+        .notes
+        .iter()
+        .find(|note| note.id == id && !is_trash_note(note))
+        .cloned())
+}
+
+#[tauri::command]
+fn consume_pending_note_id(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    let mut pending = state
+        .pending_note_id
+        .lock()
+        .map_err(|_| "store lock poisoned".to_string())?;
+    Ok(pending.take())
 }
 
 #[tauri::command]
@@ -439,12 +459,16 @@ fn open_window(
         return Ok(window);
     }
 
-    let window = WebviewWindowBuilder::new(app, label, url)
+    let mut builder = WebviewWindowBuilder::new(app, label, url)
         .title(title)
         .inner_size(480.0, 620.0)
-        .resizable(true)
-        .build()
-        .map_err(|e| e.to_string())?;
+        .resizable(true);
+
+    if cfg!(target_os = "windows") {
+        builder = builder.decorations(false).shadow(true);
+    }
+
+    let window = builder.build().map_err(|e| e.to_string())?;
 
     // Ensure newly created windows are actually visible/focused on Windows.
     focus_existing_window(&window)?;
@@ -462,11 +486,19 @@ fn set_window_location(window: &tauri::WebviewWindow, location: &str) -> Result<
 }
 
 #[tauri::command]
-fn open_note(app: AppHandle, note_id: Option<String>) -> Result<bool, String> {
+fn open_note(app: AppHandle, state: State<'_, AppState>, note_id: Option<String>) -> Result<bool, String> {
     let mut location = String::from("note.html");
     if let Some(id) = note_id.as_deref().filter(|id| !id.is_empty()) {
         location.push_str("?id=");
         location.push_str(id);
+
+        // New windows can fail to navigate via eval before the DOM is ready. Persist the intent
+        // so the note page can load it on first mount.
+        let mut pending = state
+            .pending_note_id
+            .lock()
+            .map_err(|_| "pending note id lock poisoned".to_string())?;
+        *pending = Some(id.to_string());
     }
 
     if let Some(window) = app.get_webview_window("note") {
@@ -476,10 +508,7 @@ fn open_note(app: AppHandle, note_id: Option<String>) -> Result<bool, String> {
     }
 
     // WebviewUrl::App ultimately becomes a PathBuf; `?` in the path breaks on Windows.
-    let window = open_window(&app, "note", "便签", WebviewUrl::App("note.html".into()))?;
-    if location != "note.html" {
-        set_window_location(&window, &location)?;
-    }
+    let _ = open_window(&app, "note", "便签", WebviewUrl::App("note.html".into()))?;
 
     Ok(true)
 }
@@ -533,11 +562,14 @@ pub fn run() {
             app.manage(AppState {
                 store_path,
                 store: Mutex::new(store),
+                pending_note_id: Mutex::new(None),
             });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             get_notes,
+            get_note_by_id,
+            consume_pending_note_id,
             get_trash_notes,
             create_note,
             save_note,
