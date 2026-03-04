@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import type { StickyNote } from '../../shared/types';
 
 const NOTE_COLORS = ['#fff9c4', '#c8e6c9', '#bbdefb', '#f8bbd0', '#e1bee7', '#ffe0b2', '#d7ccc8', '#b2dfdb'];
@@ -25,6 +25,23 @@ const styles = {
     gap: '4px',
     WebkitAppRegion: 'no-drag' as unknown as string,
   },
+  modeToggle: {
+    display: 'inline-flex',
+    borderRadius: '999px',
+    background: 'rgba(255,255,255,0.34)',
+    padding: '2px',
+    gap: '2px',
+  },
+  modeBtn: {
+    border: 'none',
+    borderRadius: '999px',
+    padding: '2px 8px',
+    fontSize: '11px',
+    color: 'rgba(0,0,0,0.62)',
+    background: 'transparent',
+    cursor: 'pointer',
+    transition: 'background 0.15s, color 0.15s',
+  },
   iconBtn: {
     width: 24,
     height: 24,
@@ -36,7 +53,7 @@ const styles = {
     color: 'rgba(0,0,0,0.5)',
     transition: 'background 0.15s, color 0.15s',
   },
-  textarea: {
+  sourceTextarea: {
     flex: 1,
     border: 'none',
     outline: 'none',
@@ -47,6 +64,30 @@ const styles = {
     fontFamily: 'inherit',
     background: 'transparent',
     color: 'rgba(0,0,0,0.8)',
+  },
+  previewLayout: {
+    flex: 1,
+    display: 'grid',
+    gridTemplateRows: 'minmax(120px, 42%) minmax(0, 1fr)',
+  },
+  previewInput: {
+    border: 'none',
+    outline: 'none',
+    resize: 'none' as const,
+    padding: '8px 14px',
+    fontSize: '14px',
+    lineHeight: '1.6',
+    fontFamily: 'inherit',
+    background: 'rgba(255,255,255,0.34)',
+    color: 'rgba(0,0,0,0.86)',
+    borderBottom: '1px solid rgba(0,0,0,0.1)',
+  },
+  previewPane: {
+    overflow: 'auto' as const,
+    padding: '10px 14px 14px',
+    fontSize: '14px',
+    lineHeight: '1.7',
+    color: 'rgba(0,0,0,0.83)',
   },
   footer: {
     padding: '6px 10px 8px',
@@ -81,11 +122,157 @@ const styles = {
   },
 };
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function sanitizeUrl(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+
+  if (/^(https?:|file:|\/|\.\/|\.\.\/|data:image\/)/i.test(value)) {
+    return value;
+  }
+
+  return null;
+}
+
+function renderInlineMarkdown(line: string): string {
+  let html = escapeHtml(line);
+
+  html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_full, alt, src) => {
+    const safe = sanitizeUrl(src);
+    if (!safe) return `![${escapeHtml(alt)}](${escapeHtml(src)})`;
+    return `<img src="${escapeHtml(safe)}" alt="${escapeHtml(alt)}" style="max-width:100%;border-radius:6px;display:block;margin:6px 0;" />`;
+  });
+
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_full, text, href) => {
+    const safe = sanitizeUrl(href);
+    if (!safe) return `[${escapeHtml(text)}](${escapeHtml(href)})`;
+    return `<a href="${escapeHtml(safe)}" target="_blank" rel="noreferrer" style="color:#1565c0;">${escapeHtml(text)}</a>`;
+  });
+
+  return html.replace(/`([^`]+)`/g, (_full, code) => {
+    return `<code style="background:rgba(0,0,0,0.08);padding:1px 4px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${escapeHtml(code)}</code>`;
+  });
+}
+
+function renderMarkdownToHtml(markdown: string): string {
+  const lines = markdown.replace(/\r\n?/g, '\n').split('\n');
+  const html: string[] = [];
+
+  let inCodeBlock = false;
+  let codeBuffer: string[] = [];
+  let codeLang = '';
+  let listMode: 'ul' | 'ol' | null = null;
+
+  const closeList = () => {
+    if (listMode) {
+      html.push(`</${listMode}>`);
+      listMode = null;
+    }
+  };
+
+  const flushCode = () => {
+    const langClass = codeLang ? ` class="language-${escapeHtml(codeLang)}"` : '';
+    html.push(`<pre style="margin:8px 0;padding:8px 10px;background:rgba(0,0,0,0.08);border-radius:8px;overflow:auto;"><code${langClass}>${escapeHtml(codeBuffer.join('\n'))}</code></pre>`);
+    codeBuffer = [];
+    codeLang = '';
+  };
+
+  for (const line of lines) {
+    const codeFence = line.match(/^```\s*([^\s`]+)?\s*$/);
+    if (codeFence) {
+      closeList();
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeLang = codeFence[1] ?? '';
+      } else {
+        inCodeBlock = false;
+        flushCode();
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBuffer.push(line);
+      continue;
+    }
+
+    if (!line.trim()) {
+      closeList();
+      continue;
+    }
+
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      closeList();
+      const level = headingMatch[1].length;
+      html.push(`<h${level} style="margin:10px 0 6px;font-size:${Math.max(16, 28 - level * 2)}px;line-height:1.35;">${renderInlineMarkdown(headingMatch[2])}</h${level}>`);
+      continue;
+    }
+
+    const orderedMatch = line.match(/^\d+\.\s+(.*)$/);
+    if (orderedMatch) {
+      if (listMode !== 'ol') {
+        closeList();
+        html.push('<ol style="margin:6px 0 8px;padding-left:22px;">');
+        listMode = 'ol';
+      }
+      html.push(`<li>${renderInlineMarkdown(orderedMatch[1])}</li>`);
+      continue;
+    }
+
+    const unorderedMatch = line.match(/^[-*]\s+(.*)$/);
+    if (unorderedMatch) {
+      if (listMode !== 'ul') {
+        closeList();
+        html.push('<ul style="margin:6px 0 8px;padding-left:22px;">');
+        listMode = 'ul';
+      }
+      html.push(`<li>${renderInlineMarkdown(unorderedMatch[1])}</li>`);
+      continue;
+    }
+
+    const quoteMatch = line.match(/^>\s?(.*)$/);
+    if (quoteMatch) {
+      closeList();
+      html.push(`<blockquote style="margin:8px 0;padding:2px 0 2px 10px;border-left:3px solid rgba(0,0,0,0.2);color:rgba(0,0,0,0.68);">${renderInlineMarkdown(quoteMatch[1])}</blockquote>`);
+      continue;
+    }
+
+    closeList();
+    html.push(`<p style="margin:7px 0;">${renderInlineMarkdown(line)}</p>`);
+  }
+
+  closeList();
+
+  if (inCodeBlock) {
+    flushCode();
+  }
+
+  if (html.length === 0) {
+    return '<p style="margin:7px 0;color:rgba(0,0,0,0.45);">在上方输入 Markdown 内容，这里会实时预览。</p>';
+  }
+
+  return html.join('');
+}
+
 export function NoteWindow() {
   const [note, setNote] = useState<StickyNote | null>(null);
   const [pinned, setPinned] = useState(false);
+  const [editorMode, setEditorMode] = useState<'preview' | 'source'>('preview');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const renderedMarkdown = useMemo(() => {
+    return renderMarkdownToHtml(note?.content ?? '');
+  }, [note?.content]);
 
   // 从 URL 获取便签 ID
   const noteId = new URLSearchParams(window.location.search).get('id');
@@ -196,6 +383,34 @@ export function NoteWindow() {
           </button>
         </div>
         <div style={styles.headerActions}>
+          <div style={styles.modeToggle} aria-label="编辑模式切换">
+            <button
+              style={{
+                ...styles.modeBtn,
+                background: editorMode === 'preview' ? 'rgba(255,255,255,0.74)' : 'transparent',
+                color: editorMode === 'preview' ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,0,0.62)',
+              }}
+              onClick={() => setEditorMode('preview')}
+              title="实时预览"
+              aria-label="切换到实时预览模式"
+            >
+              预览
+            </button>
+            <button
+              style={{
+                ...styles.modeBtn,
+                background: editorMode === 'source' ? 'rgba(255,255,255,0.74)' : 'transparent',
+                color: editorMode === 'source' ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,0,0.62)',
+              }}
+              onClick={() => setEditorMode('source')}
+              title="源码模式"
+              aria-label="切换到源码模式"
+            >
+              源码
+            </button>
+          </div>
+        </div>
+        <div style={styles.headerActions}>
           <button
             style={styles.iconBtn}
             onClick={handleMoveToTrash}
@@ -225,14 +440,32 @@ export function NoteWindow() {
         </div>
       </div>
 
-      <textarea
-        ref={textareaRef}
-        style={styles.textarea}
-        value={note.content}
-        onChange={e => handleContentChange(e.target.value)}
-        placeholder="在这里写点什么..."
-        aria-label="便签内容"
-      />
+      {editorMode === 'source' ? (
+        <textarea
+          ref={textareaRef}
+          style={styles.sourceTextarea}
+          value={note.content}
+          onChange={e => handleContentChange(e.target.value)}
+          placeholder="在这里写点什么..."
+          aria-label="Markdown 源码编辑区"
+        />
+      ) : (
+        <div style={styles.previewLayout}>
+          <textarea
+            ref={textareaRef}
+            style={styles.previewInput}
+            value={note.content}
+            onChange={e => handleContentChange(e.target.value)}
+            placeholder="在这里输入 Markdown 内容..."
+            aria-label="Markdown 输入区"
+          />
+          <div
+            style={styles.previewPane}
+            aria-label="Markdown 实时预览"
+            dangerouslySetInnerHTML={{ __html: renderedMarkdown }}
+          />
+        </div>
+      )}
 
       <div style={styles.footer}>
         <div style={styles.colorRow}>
