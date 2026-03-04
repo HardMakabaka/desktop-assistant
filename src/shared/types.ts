@@ -39,6 +39,11 @@ export interface StartupLaunchStatus {
   enabled: boolean;
 }
 
+export interface TextShortcut {
+  action: 'insertHeading' | 'insertBullet' | 'insertQuote';
+  combo: string;
+}
+
 /** IPC 频道 */
 export const IPC_CHANNELS = {
   // 便签

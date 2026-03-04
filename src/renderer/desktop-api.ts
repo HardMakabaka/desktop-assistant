@@ -4,6 +4,7 @@ import type {
   CalendarMark,
   StartupLaunchStatus,
   StickyNote,
+  TextShortcut,
   UpdateCheckResponse,
 } from '../shared/types';
 
@@ -27,6 +28,8 @@ export interface DesktopAPI {
   checkForUpdates: () => Promise<UpdateCheckResponse>;
   getStartupLaunchStatus: () => Promise<StartupLaunchStatus>;
   setStartupLaunchEnabled: (enabled: boolean) => Promise<StartupLaunchStatus>;
+  getTextShortcuts: () => Promise<TextShortcut[]>;
+  saveTextShortcut: (shortcut: TextShortcut) => Promise<TextShortcut[]>;
 }
 
 const desktopAPI: DesktopAPI = {
@@ -49,6 +52,8 @@ const desktopAPI: DesktopAPI = {
   checkForUpdates: () => invoke('check_for_updates'),
   getStartupLaunchStatus: () => invoke('get_startup_launch_status'),
   setStartupLaunchEnabled: enabled => invoke('set_startup_launch_enabled', { enabled }),
+  getTextShortcuts: () => invoke('get_text_shortcuts'),
+  saveTextShortcut: shortcut => invoke('save_text_shortcut', { shortcut }),
 };
 
 window.desktopAPI = desktopAPI;

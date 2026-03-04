@@ -7,6 +7,11 @@ use tauri::{Manager, State, Window};
 
 const NOTE_COLORS: [&str; 6] = ["#fff9c4", "#c8e6c9", "#bbdefb", "#f8bbd0", "#e1bee7", "#ffe0b2"];
 const DEFAULT_NOTE_OPACITY: f64 = 0.92;
+const SHORTCUT_ACTIONS: [(&str, &str); 3] = [
+    ("insertHeading", "Ctrl+Alt+1"),
+    ("insertBullet", "Ctrl+Alt+L"),
+    ("insertQuote", "Ctrl+Alt+Q"),
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -72,6 +77,13 @@ struct StartupLaunchStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct TextShortcut {
+    action: String,
+    combo: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct NoteUpdate {
     id: String,
     content: Option<String>,
@@ -97,6 +109,8 @@ struct PersistedStore {
     notes: Vec<StickyNote>,
     marks: Vec<CalendarMark>,
     calendar_appearance: CalendarAppearance,
+    #[serde(default = "default_text_shortcuts")]
+    text_shortcuts: Vec<TextShortcut>,
 }
 
 struct AppState {
@@ -127,7 +141,38 @@ fn default_store() -> PersistedStore {
             color: "#ffffff".to_string(),
             opacity: 0.94,
         },
+        text_shortcuts: default_text_shortcuts(),
     }
+}
+
+fn default_text_shortcuts() -> Vec<TextShortcut> {
+    SHORTCUT_ACTIONS
+        .iter()
+        .map(|(action, combo)| TextShortcut {
+            action: (*action).to_string(),
+            combo: (*combo).to_string(),
+        })
+        .collect()
+}
+
+fn normalize_text_shortcuts(shortcuts: &mut Vec<TextShortcut>) {
+    let mut normalized = Vec::with_capacity(SHORTCUT_ACTIONS.len());
+
+    for (action, default_combo) in SHORTCUT_ACTIONS {
+        let combo = shortcuts
+            .iter()
+            .find(|item| item.action == action)
+            .map(|item| item.combo.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| default_combo.to_string());
+
+        normalized.push(TextShortcut {
+            action: action.to_string(),
+            combo,
+        });
+    }
+
+    *shortcuts = normalized;
 }
 
 fn load_store(path: &PathBuf) -> PersistedStore {
@@ -331,6 +376,35 @@ fn save_calendar_appearance(
 }
 
 #[tauri::command]
+fn get_text_shortcuts(state: State<'_, AppState>) -> Result<Vec<TextShortcut>, String> {
+    let mut store = state.store.lock().map_err(|_| "store lock poisoned".to_string())?;
+    normalize_text_shortcuts(&mut store.text_shortcuts);
+    Ok(store.text_shortcuts.clone())
+}
+
+#[tauri::command]
+fn save_text_shortcut(
+    state: State<'_, AppState>,
+    shortcut: TextShortcut,
+) -> Result<Vec<TextShortcut>, String> {
+    let mut store = state.store.lock().map_err(|_| "store lock poisoned".to_string())?;
+
+    if let Some(existing) = store
+        .text_shortcuts
+        .iter_mut()
+        .find(|item| item.action == shortcut.action)
+    {
+        existing.combo = shortcut.combo;
+    } else {
+        store.text_shortcuts.push(shortcut);
+    }
+
+    normalize_text_shortcuts(&mut store.text_shortcuts);
+    save_store(&state.store_path, &store)?;
+    Ok(store.text_shortcuts.clone())
+}
+
+#[tauri::command]
 fn pin_window(window: Window, pinned: bool) -> Result<bool, String> {
     window
         .set_always_on_top(pinned)
@@ -413,7 +487,9 @@ pub fn run() {
             open_calendar,
             check_for_updates,
             get_startup_launch_status,
-            set_startup_launch_enabled
+            set_startup_launch_enabled,
+            get_text_shortcuts,
+            save_text_shortcut
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

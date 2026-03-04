@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { createWorker } from 'tesseract.js';
-import type { StickyNote } from '../../shared/types';
+import type { StickyNote, TextShortcut } from '../../shared/types';
 
 const NOTE_COLORS = ['#fff9c4', '#c8e6c9', '#bbdefb', '#f8bbd0', '#e1bee7', '#ffe0b2', '#d7ccc8', '#b2dfdb'];
 
@@ -21,8 +21,31 @@ type CaptureDraft = {
   selection: SelectionBox | null;
 };
 
+type TextMutation = {
+  content: string;
+  selectionStart: number;
+  selectionEnd: number;
+};
+
 const OCR_LANGS = 'chi_sim+eng';
 const MIN_SELECTION_SIZE = 12;
+const DEFAULT_TEXT_SHORTCUTS: TextShortcut[] = [
+  { action: 'insertHeading', combo: 'Ctrl+Alt+1' },
+  { action: 'insertBullet', combo: 'Ctrl+Alt+L' },
+  { action: 'insertQuote', combo: 'Ctrl+Alt+Q' },
+];
+
+const SHORTCUT_LABELS: Record<TextShortcut['action'], string> = {
+  insertHeading: '插入标题',
+  insertBullet: '插入列表项',
+  insertQuote: '插入引用',
+};
+
+const SHORTCUT_PREFIX: Record<TextShortcut['action'], string> = {
+  insertHeading: '# ',
+  insertBullet: '- ',
+  insertQuote: '> ',
+};
 
 const styles = {
   container: {
@@ -62,6 +85,37 @@ const styles = {
     background: 'transparent',
     cursor: 'pointer',
     transition: 'background 0.15s, color 0.15s',
+  },
+  shortcutPanel: {
+    padding: '8px 10px',
+    borderBottom: '1px solid rgba(0,0,0,0.12)',
+    background: 'rgba(255,255,255,0.28)',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
+  },
+  shortcutHint: {
+    fontSize: '11px',
+    color: 'rgba(0,0,0,0.58)',
+  },
+  shortcutRow: {
+    display: 'grid',
+    gridTemplateColumns: '90px minmax(0, 1fr)',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  shortcutLabel: {
+    fontSize: '11px',
+    color: 'rgba(0,0,0,0.7)',
+  },
+  shortcutInput: {
+    border: '1px solid rgba(0,0,0,0.16)',
+    borderRadius: '6px',
+    padding: '4px 8px',
+    fontSize: '11px',
+    background: 'rgba(255,255,255,0.68)',
+    color: 'rgba(0,0,0,0.85)',
+    outline: 'none',
   },
   iconBtn: {
     width: 24,
@@ -374,6 +428,63 @@ function getLocalPoint(event: React.MouseEvent, element: HTMLElement): Point {
   };
 }
 
+function mergeShortcuts(shortcuts: TextShortcut[]): TextShortcut[] {
+  return DEFAULT_TEXT_SHORTCUTS.map(defaultItem => {
+    const matched = shortcuts.find(item => item.action === defaultItem.action);
+    return {
+      action: defaultItem.action,
+      combo: matched?.combo?.trim() || defaultItem.combo,
+    };
+  });
+}
+
+function applyLinePrefix(value: string, selectionStart: number, selectionEnd: number, prefix: string): TextMutation {
+  const start = Math.max(0, selectionStart);
+  const end = Math.max(start, selectionEnd);
+  const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+  const lineEndCandidate = value.indexOf('\n', end);
+  const lineEnd = lineEndCandidate === -1 ? value.length : lineEndCandidate;
+
+  const segment = value.slice(lineStart, lineEnd);
+  const lines = segment.split('\n');
+  const updatedSegment = lines.map(line => `${prefix}${line}`).join('\n');
+  const updatedContent = `${value.slice(0, lineStart)}${updatedSegment}${value.slice(lineEnd)}`;
+
+  return {
+    content: updatedContent,
+    selectionStart: start + prefix.length,
+    selectionEnd: end + lines.length * prefix.length,
+  };
+}
+
+function normalizeShortcutCombo(
+  event: React.KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>,
+): string | null {
+  if (!(event.ctrlKey || event.metaKey || event.altKey)) {
+    return null;
+  }
+
+  if (event.key === 'Tab') {
+    return null;
+  }
+
+  const rawKey = event.key;
+  if (['Control', 'Alt', 'Shift', 'Meta'].includes(rawKey)) {
+    return null;
+  }
+
+  const key = rawKey.length === 1 ? rawKey.toUpperCase() : rawKey;
+  const parts: string[] = [];
+
+  if (event.ctrlKey) parts.push('Ctrl');
+  if (event.metaKey) parts.push('Meta');
+  if (event.altKey) parts.push('Alt');
+  if (event.shiftKey) parts.push('Shift');
+  parts.push(key === ' ' ? 'Space' : key);
+
+  return parts.join('+');
+}
+
 async function captureScreenImage(): Promise<string> {
   if (!navigator.mediaDevices?.getDisplayMedia) {
     throw new Error('当前环境不支持截图，请在桌面端启用屏幕捕获权限。');
@@ -485,6 +596,9 @@ export function NoteWindow() {
   const [pinned, setPinned] = useState(false);
   const [editorMode, setEditorMode] = useState<'preview' | 'source'>('preview');
   const [ocrError, setOcrError] = useState<string | null>(null);
+  const [shortcutError, setShortcutError] = useState<string | null>(null);
+  const [textShortcuts, setTextShortcuts] = useState<TextShortcut[]>(DEFAULT_TEXT_SHORTCUTS);
+  const [showShortcutPanel, setShowShortcutPanel] = useState(false);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [captureDraft, setCaptureDraft] = useState<CaptureDraft | null>(null);
   const [dragStart, setDragStart] = useState<Point | null>(null);
@@ -509,9 +623,19 @@ export function NoteWindow() {
     }
   }, [noteId]);
 
+  const loadTextShortcuts = useCallback(async () => {
+    try {
+      const shortcuts = await window.desktopAPI.getTextShortcuts();
+      setTextShortcuts(mergeShortcuts(shortcuts));
+    } catch {
+      setTextShortcuts(DEFAULT_TEXT_SHORTCUTS);
+    }
+  }, []);
+
   useEffect(() => {
     loadNote();
-  }, [loadNote]);
+    loadTextShortcuts();
+  }, [loadNote, loadTextShortcuts]);
 
   useEffect(() => {
     if (note && textareaRef.current) {
@@ -528,6 +652,67 @@ export function NoteWindow() {
     saveTimerRef.current = setTimeout(() => {
       window.desktopAPI.saveNote({ id: note.id, content });
     }, 300);
+  };
+
+  const applyMutationToEditor = (textarea: HTMLTextAreaElement, mutation: TextMutation) => {
+    handleContentChange(mutation.content);
+    requestAnimationFrame(() => {
+      textarea.focus();
+      textarea.setSelectionRange(mutation.selectionStart, mutation.selectionEnd);
+    });
+  };
+
+  const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      const mutation = applyLinePrefix(
+        event.currentTarget.value,
+        event.currentTarget.selectionStart,
+        event.currentTarget.selectionEnd,
+        '  ',
+      );
+      applyMutationToEditor(event.currentTarget, mutation);
+      return;
+    }
+
+    const combo = normalizeShortcutCombo(event);
+    if (!combo) {
+      return;
+    }
+
+    const matched = textShortcuts.find(item => item.combo === combo);
+    if (!matched) {
+      return;
+    }
+
+    event.preventDefault();
+    const mutation = applyLinePrefix(
+      event.currentTarget.value,
+      event.currentTarget.selectionStart,
+      event.currentTarget.selectionEnd,
+      SHORTCUT_PREFIX[matched.action],
+    );
+    applyMutationToEditor(event.currentTarget, mutation);
+  };
+
+  const handleShortcutInputKeyDown = async (
+    event: React.KeyboardEvent<HTMLInputElement>,
+    action: TextShortcut['action'],
+  ) => {
+    event.preventDefault();
+    const combo = normalizeShortcutCombo(event);
+    if (!combo) {
+      return;
+    }
+
+    setShortcutError(null);
+    try {
+      const saved = await window.desktopAPI.saveTextShortcut({ action, combo });
+      setTextShortcuts(mergeShortcuts(saved));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '快捷键保存失败，请重试。';
+      setShortcutError(message);
+    }
   };
 
   const handlePin = async () => {
@@ -714,6 +899,18 @@ export function NoteWindow() {
         </div>
         <div style={styles.headerActions}>
           <button
+            style={{
+              ...styles.iconBtn,
+              background: showShortcutPanel ? 'rgba(33,150,243,0.22)' : 'transparent',
+              color: showShortcutPanel ? '#0d47a1' : 'rgba(0,0,0,0.5)',
+            }}
+            onClick={() => setShowShortcutPanel(prev => !prev)}
+            title="文本快捷键"
+            aria-label="切换文本快捷键设置"
+          >
+            ⌨
+          </button>
+          <button
             style={styles.iconBtn}
             onClick={handleStartOcrCapture}
             onMouseEnter={e => {
@@ -759,12 +956,31 @@ export function NoteWindow() {
         </div>
       </div>
 
+      {showShortcutPanel ? (
+        <div style={styles.shortcutPanel}>
+          <div style={styles.shortcutHint}>在输入框中按下新的快捷键组合（需包含 Ctrl/Alt/Meta）。</div>
+          {textShortcuts.map(shortcut => (
+            <div key={shortcut.action} style={styles.shortcutRow}>
+              <span style={styles.shortcutLabel}>{SHORTCUT_LABELS[shortcut.action]}</span>
+              <input
+                style={styles.shortcutInput}
+                value={shortcut.combo}
+                readOnly
+                onKeyDown={event => void handleShortcutInputKeyDown(event, shortcut.action)}
+                aria-label={`配置快捷键：${SHORTCUT_LABELS[shortcut.action]}`}
+              />
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       {editorMode === 'source' ? (
         <textarea
           ref={textareaRef}
           style={styles.sourceTextarea}
           value={note.content}
           onChange={e => handleContentChange(e.target.value)}
+          onKeyDown={handleEditorKeyDown}
           placeholder="在这里写点什么..."
           aria-label="Markdown 源码编辑区"
         />
@@ -775,6 +991,7 @@ export function NoteWindow() {
             style={styles.previewInput}
             value={note.content}
             onChange={e => handleContentChange(e.target.value)}
+            onKeyDown={handleEditorKeyDown}
             placeholder="在这里输入 Markdown 内容..."
             aria-label="Markdown 输入区"
           />
@@ -818,8 +1035,8 @@ export function NoteWindow() {
           />
           <span>{Math.round(normalizedOpacity * 100)}%</span>
         </div>
-        <div style={styles.footerStatus} title={ocrError ?? undefined}>
-          {ocrBusy ? 'OCR 处理中...' : ocrError ?? 'OCR 就绪'}
+        <div style={styles.footerStatus} title={(shortcutError ?? ocrError) ?? undefined}>
+          {shortcutError ?? (ocrBusy ? 'OCR 处理中...' : ocrError ?? 'OCR 就绪')}
         </div>
       </div>
 
