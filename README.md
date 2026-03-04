@@ -1,18 +1,28 @@
 # desktop-assistant
 
-桌面助手（Electron）- 提供便签与日历桌面小工具，支持 Windows 与 Linux（Ubuntu/CentOS）。
+桌面助手（Tauri2）- 提供便签与日历桌面小工具，支持 Windows 与 Linux（Ubuntu/CentOS）。
 
-## 开发
+## 开发环境
+
+### 1) 前置依赖
+
+- Node.js 20+
+- Rust stable（`rustup default stable`）
+- Tauri2 运行依赖（Linux 需安装 WebKitGTK 等系统库，建议按 Tauri 官方文档初始化）
+
+### 2) 本地开发
 
 ```bash
 npm ci
 npm run dev
 ```
 
+`npm run dev` 会启动 `tauri dev`（Vite renderer + Tauri shell）。
+
 ## 构建与打包
 
 ```bash
-# 通用构建
+# 构建 renderer（用于 CI 校验）
 npm run build
 
 # Windows 安装包（nsis）
@@ -22,14 +32,37 @@ npm run pack:win
 npm run pack:linux
 ```
 
-生成产物默认在 `release/` 目录。
+生成产物默认在 `src-tauri/target/release/bundle/` 目录。
+
+## OCR 与截图依赖说明
+
+- OCR 由前端 `tesseract.js` 提供（语言包：`chi_sim+eng`）。
+- 首次 OCR 可能需要联网下载语言数据，后续会复用本地缓存。
+- 截图依赖浏览器屏幕捕获 API（`getDisplayMedia`）：
+  - Windows/Linux 均可用；
+  - 需要系统授予屏幕捕获权限；
+  - Wayland 桌面建议确保 `xdg-desktop-portal` 与 PipeWire 可用。
+
+## Markdown 双模式与删除流程
+
+### Markdown 双模式
+
+- **预览模式（默认）**：上半部分编辑 Markdown 源文，下半部分实时渲染预览。
+- **源码模式**：单栏纯文本编辑，适合快速批量修改。
+- 头部切换按钮可在「预览/源码」之间即时切换。
+
+### 删除流程（垃圾桶）
+
+- 便签窗口仅提供「移入垃圾桶」，不直接永久删除。
+- 主面板垃圾桶支持「恢复」与「永久删除」。
+- 永久删除包含二次确认，避免误删。
 
 ## Linux 安装
 
 ### Ubuntu / Debian（deb）
 
 ```bash
-sudo apt install ./release/桌面助手-<version>-linux-amd64.deb
+sudo apt install ./src-tauri/target/release/bundle/deb/桌面助手_<version>_amd64.deb
 ```
 
 卸载：
@@ -42,10 +75,10 @@ sudo apt remove desktop-assistant
 
 ```bash
 # CentOS / RHEL
-sudo yum install ./release/桌面助手-<version>-linux-x86_64.rpm
+sudo yum install ./src-tauri/target/release/bundle/rpm/桌面助手-<version>-1.x86_64.rpm
 
 # Fedora
-sudo dnf install ./release/桌面助手-<version>-linux-x86_64.rpm
+sudo dnf install ./src-tauri/target/release/bundle/rpm/桌面助手-<version>-1.x86_64.rpm
 ```
 
 卸载：
@@ -58,7 +91,7 @@ sudo dnf remove desktop-assistant
 
 ## Linux 更新说明
 
-Linux 版本不使用内置 `electron-updater` 自动更新。
+Linux 版本不使用内置自动更新。
 请使用系统包管理器更新：
 
 ```bash
