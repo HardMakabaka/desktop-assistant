@@ -1,11 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { isTauri } from '@tauri-apps/api/core';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import type { CalendarMark, CalendarAppearance } from '../../shared/types';
+import type { CalendarMark } from '../../shared/types';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 const MARK_COLORS = ['#e53935', '#43a047', '#1e88e5', '#fb8c00', '#8e24aa', '#00acc1'];
-const CALENDAR_COLORS = ['#ffffff', '#f3e5f5', '#e3f2fd', '#e8f5e9', '#fff3e0', '#fce4ec', '#ede7f6'];
 
 const styles = {
   container: {
@@ -25,34 +22,6 @@ const styles = {
     background: '#1976d2',
     color: '#fff',
     WebkitAppRegion: 'drag' as unknown as string,
-  },
-  headerTools: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '6px 10px',
-    background: 'rgba(255,255,255,0.84)',
-    borderBottom: '1px solid rgba(0,0,0,0.08)',
-  },
-  miniLabel: {
-    fontSize: '11px',
-    color: '#666',
-  },
-  colorRowMini: {
-    display: 'flex',
-    gap: '5px',
-    alignItems: 'center',
-  },
-  colorDotMini: {
-    width: 14,
-    height: 14,
-    borderRadius: '50%',
-    border: '1px solid rgba(0,0,0,0.12)',
-    cursor: 'pointer',
-    transition: 'transform 0.15s, box-shadow 0.15s',
-  },
-  rangeMini: {
-    width: '84px',
   },
   headerActions: {
     display: 'flex',
@@ -207,7 +176,6 @@ export function CalendarWindow() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [markLabel, setMarkLabel] = useState('');
   const [markColor, setMarkColor] = useState(MARK_COLORS[0]);
-  const [appearance, setAppearance] = useState<CalendarAppearance>({ color: '#ffffff', opacity: 0.94 });
 
   const loadMarks = useCallback(async () => {
     const data = await window.desktopAPI.getMarks();
@@ -215,29 +183,8 @@ export function CalendarWindow() {
   }, []);
 
   useEffect(() => {
-    if (isTauri() && /Windows/i.test(navigator.userAgent)) {
-      const win = getCurrentWindow();
-      win.setDecorations(false).catch(() => {});
-      win.setShadow(true).catch(() => {});
-    }
-
     loadMarks();
   }, [loadMarks]);
-
-  useEffect(() => {
-    let active = true;
-    window.desktopAPI.getCalendarAppearance().then(data => {
-      if (!active) return;
-      setAppearance(data);
-    }).catch(() => {
-      if (!active) return;
-      setAppearance({ color: '#ffffff', opacity: 0.94 });
-    });
-
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const prevMonth = () => {
     if (month === 0) { setYear(y => y - 1); setMonth(11); }
@@ -255,9 +202,7 @@ export function CalendarWindow() {
     await window.desktopAPI.pinWindow(newPinned);
   };
 
-  const handleClose = () => {
-    void getCurrentWindow().close();
-  };
+  const handleClose = () => window.desktopAPI.closeWindow();
 
   const handleDayClick = (day: number) => {
     const date = formatDate(year, month, day);
@@ -285,29 +230,6 @@ export function CalendarWindow() {
     loadMarks();
   };
 
-  const handleCalendarColorChange = async (color: string) => {
-    const next = await window.desktopAPI.saveCalendarAppearance({ color });
-    setAppearance(next);
-  };
-
-  const handleCalendarOpacityChange = async (opacity: number) => {
-    const next = await window.desktopAPI.saveCalendarAppearance({ opacity });
-    setAppearance(next);
-  };
-
-  const normalizedOpacity = Math.min(1, Math.max(0.2, appearance.opacity));
-
-  const toRgba = (hex: string, alpha: number): string => {
-    const value = hex.replace('#', '');
-    const color = value.length === 3
-      ? value.split('').map(ch => ch + ch).join('')
-      : value;
-    const r = Number.parseInt(color.slice(0, 2), 16);
-    const g = Number.parseInt(color.slice(2, 4), 16);
-    const b = Number.parseInt(color.slice(4, 6), 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-  };
-
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfWeek(year, month);
   const todayStr = formatDate(today.getFullYear(), today.getMonth(), today.getDate());
@@ -317,8 +239,8 @@ export function CalendarWindow() {
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
 
   return (
-    <div style={{ ...styles.container, background: toRgba(appearance.color, normalizedOpacity) }}>
-      <div style={styles.header} data-tauri-drag-region>
+    <div style={styles.container}>
+      <div style={styles.header}>
         <div style={styles.headerActions}>
           <button
             style={styles.navBtn}
@@ -343,7 +265,6 @@ export function CalendarWindow() {
         <div style={styles.headerActions}>
           <button
             style={{ ...styles.iconBtn, color: pinned ? '#ffeb3b' : '#fff' }}
-            data-tauri-drag-region="false"
             onClick={handlePin}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -354,7 +275,6 @@ export function CalendarWindow() {
           </button>
           <button
             style={styles.iconBtn}
-            data-tauri-drag-region="false"
             onClick={handleClose}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
@@ -363,39 +283,6 @@ export function CalendarWindow() {
             ✕
           </button>
         </div>
-      </div>
-
-      <div style={styles.headerTools}>
-        <span style={styles.miniLabel}>背景</span>
-        <div style={styles.colorRowMini}>
-          {CALENDAR_COLORS.map(color => (
-            <div
-              key={color}
-              style={{
-                ...styles.colorDotMini,
-                background: color,
-                transform: color === appearance.color ? 'scale(1.15)' : 'scale(1)',
-                boxShadow: color === appearance.color ? '0 0 0 2px rgba(0,0,0,0.2)' : 'none',
-              }}
-              role="button"
-              tabIndex={0}
-              onClick={() => void handleCalendarColorChange(color)}
-              onKeyDown={e => e.key === 'Enter' && void handleCalendarColorChange(color)}
-              aria-label={`设置日历背景颜色 ${color}`}
-            />
-          ))}
-        </div>
-        <span style={styles.miniLabel}>透明度</span>
-        <input
-          style={styles.rangeMini}
-          type="range"
-          min={20}
-          max={100}
-          value={Math.round(normalizedOpacity * 100)}
-          onChange={e => void handleCalendarOpacityChange(Number(e.target.value) / 100)}
-          aria-label="调整日历透明度"
-        />
-        <span style={styles.miniLabel}>{Math.round(normalizedOpacity * 100)}%</span>
       </div>
 
       <div style={styles.weekRow}>
