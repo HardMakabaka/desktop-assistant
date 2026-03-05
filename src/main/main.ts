@@ -1,10 +1,10 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog, NativeImage } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, dialog } from 'electron';
 import * as path from 'path';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
 import { autoUpdater } from 'electron-updater';
 import { StoreManager } from './store';
-import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse, CalendarAppearance, StartupLaunchStatus } from '../shared/types';
+import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse } from '../shared/types';
 
 const devServerURL = process.env.DESKTOP_ASSISTANT_DEV_URL || process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(devServerURL);
@@ -16,103 +16,6 @@ const noteWindows = new Map<string, BrowserWindow>();
 let calendarWindow: BrowserWindow | null = null;
 let cachedPreloadPath: string | null = null;
 let updateDownloaded = false;
-
-function createTrayIcon(): NativeImage {
-  const iconSVG = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-      <defs>
-        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#4f8cff" />
-          <stop offset="100%" stop-color="#6f6cff" />
-        </linearGradient>
-      </defs>
-      <rect x="4" y="4" width="56" height="56" rx="16" fill="url(#bg)" />
-      <rect x="19" y="18" width="26" height="28" rx="5" fill="#ffffff" opacity="0.95" />
-      <line x1="23" y1="28" x2="41" y2="28" stroke="#4f8cff" stroke-width="3" stroke-linecap="round" />
-      <line x1="23" y1="34" x2="37" y2="34" stroke="#4f8cff" stroke-width="3" stroke-linecap="round" />
-      <line x1="23" y1="40" x2="35" y2="40" stroke="#4f8cff" stroke-width="3" stroke-linecap="round" />
-    </svg>
-  `;
-
-  const dataURL = `data:image/svg+xml;base64,${Buffer.from(iconSVG).toString('base64')}`;
-  const icon = nativeImage.createFromDataURL(dataURL);
-
-  const traySize = process.platform === 'linux' ? 22 : 16;
-  return icon.resize({ width: traySize, height: traySize });
-}
-
-const AUTOSTART_FILE_NAME = 'desktop-assistant.desktop';
-
-function isLinuxStartupSupported(): boolean {
-  return process.platform === 'linux' && app.isPackaged;
-}
-
-function getLinuxAutostartFilePath(): string {
-  const configHome = process.env.XDG_CONFIG_HOME || path.join(app.getPath('home'), '.config');
-  return path.join(configHome, 'autostart', AUTOSTART_FILE_NAME);
-}
-
-function formatDesktopExecPath(execPath: string): string {
-  if (!/\s/.test(execPath)) {
-    return execPath;
-  }
-
-  const escaped = execPath
-    .replace(/\\/g, '\\\\')
-    .replace(/"/g, '\\"');
-
-  return `"${escaped}"`;
-}
-
-function getLinuxAutostartEntryContent(): string {
-  const execPath = formatDesktopExecPath(process.execPath);
-
-  return [
-    '[Desktop Entry]',
-    'Type=Application',
-    'Version=1.0',
-    'Name=桌面助手',
-    'Comment=Desktop sticky notes and calendar widget',
-    `Exec=${execPath}`,
-    `TryExec=${execPath}`,
-    'Icon=desktop-assistant',
-    'Terminal=false',
-    'StartupNotify=false',
-    'Hidden=false',
-    'NoDisplay=false',
-    'Categories=Utility;',
-    'X-GNOME-Autostart-enabled=true',
-    'X-KDE-autostart-after=panel',
-  ].join('\n');
-}
-
-function getStartupLaunchStatus(): StartupLaunchStatus {
-  if (!isLinuxStartupSupported()) {
-    return { supported: false, enabled: false };
-  }
-
-  return {
-    supported: true,
-    enabled: existsSync(getLinuxAutostartFilePath()),
-  };
-}
-
-function setStartupLaunchEnabled(enabled: boolean): StartupLaunchStatus {
-  if (!isLinuxStartupSupported()) {
-    return { supported: false, enabled: false };
-  }
-
-  const filePath = getLinuxAutostartFilePath();
-
-  if (enabled) {
-    mkdirSync(path.dirname(filePath), { recursive: true });
-    writeFileSync(filePath, `${getLinuxAutostartEntryContent()}\n`, 'utf8');
-  } else if (existsSync(filePath)) {
-    rmSync(filePath, { force: true });
-  }
-
-  return getStartupLaunchStatus();
-}
 
 function getRendererURL(page: string): string {
   if (devServerURL) {
@@ -324,10 +227,6 @@ async function checkForUpdatesManually(): Promise<UpdateCheckResponse> {
     return { ok: false, message: '当前为开发模式，无法检查更新' };
   }
 
-  if (process.platform === 'linux') {
-    return { ok: true, message: 'Linux 版本请通过系统包管理器更新（apt/dnf/yum）' };
-  }
-
   if (updateDownloaded) {
     return { ok: true, message: '更新已下载，应用将自动重启安装' };
   }
@@ -347,7 +246,8 @@ async function checkForUpdatesManually(): Promise<UpdateCheckResponse> {
 }
 
 function createTray(): void {
-  tray = new Tray(createTrayIcon());
+  const icon = nativeImage.createEmpty();
+  tray = new Tray(icon);
   tray.setToolTip('桌面助手');
 
   const contextMenu = Menu.buildFromTemplate([
@@ -372,12 +272,6 @@ function createTray(): void {
   ]);
 
   tray.setContextMenu(contextMenu);
-
-  if (process.platform === 'linux') {
-    tray.on('click', () => createMainWindow());
-    return;
-  }
-
   tray.on('double-click', () => createMainWindow());
 }
 
@@ -393,10 +287,6 @@ function setupIPC(): void {
     return store.getAllNotes();
   });
 
-  ipcMain.handle(IPC_CHANNELS.NOTE_GET_TRASH, () => {
-    return store.getTrashNotes();
-  });
-
   ipcMain.handle(IPC_CHANNELS.NOTE_CREATE, () => {
     return handleCreateNote();
   });
@@ -407,21 +297,7 @@ function setupIPC(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.NOTE_DELETE, (_event, id: string) => {
-    const moved = store.moveNoteToTrash(id);
-    if (!moved) return false;
-    const win = noteWindows.get(id);
-    if (win && !win.isDestroyed()) win.close();
-    noteWindows.delete(id);
-    return true;
-  });
-
-  ipcMain.handle(IPC_CHANNELS.NOTE_RESTORE, (_event, id: string) => {
-    return store.restoreNote(id);
-  });
-
-  ipcMain.handle(IPC_CHANNELS.NOTE_DELETE_PERMANENT, (_event, id: string) => {
-    const deleted = store.permanentlyDeleteNote(id);
-    if (!deleted) return false;
+    store.deleteNote(id);
     const win = noteWindows.get(id);
     if (win && !win.isDestroyed()) win.close();
     noteWindows.delete(id);
@@ -441,14 +317,6 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.CALENDAR_DELETE_MARK, (_event, date: string) => {
     store.deleteMark(date);
     return true;
-  });
-
-  ipcMain.handle(IPC_CHANNELS.CALENDAR_GET_APPEARANCE, () => {
-    return store.getCalendarAppearance();
-  });
-
-  ipcMain.handle(IPC_CHANNELS.CALENDAR_SAVE_APPEARANCE, (_event, appearance: Partial<CalendarAppearance>) => {
-    return store.saveCalendarAppearance(appearance);
   });
 
   // 窗口 IPC
@@ -482,24 +350,11 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, async () => {
     return checkForUpdatesManually();
   });
-
-  ipcMain.handle(IPC_CHANNELS.STARTUP_GET_STATUS, () => {
-    return getStartupLaunchStatus();
-  });
-
-  ipcMain.handle(IPC_CHANNELS.STARTUP_SET_ENABLED, (_event, enabled: boolean) => {
-    return setStartupLaunchEnabled(Boolean(enabled));
-  });
 }
 
 function setupAutoUpdater(): void {
   if (!app.isPackaged || isDev) {
     console.log('[updater] disabled in development mode');
-    return;
-  }
-
-  if (process.platform === 'linux') {
-    console.log('[updater] disabled on linux package builds');
     return;
   }
 

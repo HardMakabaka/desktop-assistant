@@ -1,6 +1,5 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import './desktop-api';
 import { NoteWindow } from './pages/NoteWindow';
 import './styles/global.css';
 
