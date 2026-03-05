@@ -1,0 +1,4 @@
+project: desktop-assistant
+language: zh-CN
+default_status: To Do
+task_dir: backlog/tasks
