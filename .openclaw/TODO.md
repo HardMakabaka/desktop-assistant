@@ -1,0 +1,26 @@
+# desktop-assistant ULW TODO (shared context)
+
+## Gate
+- enabled: true
+- paused: false
+
+## Policy
+- do_not_modify_opencode_model_config: true
+- auto_commit_git: true
+- auto_open_pr: true
+- auto_merge_when_ci_green: true
+- auto_release_tag_after_merge: true
+- release_tag_prefix: v
+- release_bump: patch
+- base_branch: main
+- working_branch: ulw/desktop-assistant-auto
+
+## Ordered Tasks
+1. TASK-2  Markdown 模式开关与实时预览
+2. TASK-5  删除流程重构（垃圾桶缓冲与彻底删除分离）
+3. TASK-4  文本快捷键（Tab格式化与自定义快捷）
+4. TASK-3  OCR 截图识别文字
+5. TASK-6  Linux Ubuntu 适配与打包验证
+
+## Recent Runs
+- (pending)

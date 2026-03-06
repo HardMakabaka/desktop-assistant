@@ -1,0 +1,8 @@
+# ULW automation runtime artifacts
+/ulw/artifacts/
+/ulw/worktree/
+/ulw/*.lock
+/ulw/*.log
+
+# Generic caches
+/node_modules/

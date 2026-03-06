@@ -45,8 +45,49 @@ if (!statusBefore) {
 process.stdout.write('Running project verification before commit...\n');
 run('npm', ['run', 'verify']);
 
-process.stdout.write('Staging all tracked and untracked changes...\n');
-run('git', ['add', '-A']);
+function isSafeNewFilePath(path) {
+  if (!path) return false;
+
+  const allowedPrefixes = [
+    'src/',
+    'backlog/',
+    'scripts/',
+    'resources/',
+    '.openclaw/',
+    '.github/',
+  ];
+
+  const allowedFiles = new Set([
+    'package.json',
+    'package-lock.json',
+    'tsconfig.json',
+    'tsconfig.main.json',
+    'vite.config.ts',
+    '.gitignore',
+    'README.md',
+  ]);
+
+  if (allowedFiles.has(path)) return true;
+  return allowedPrefixes.some((prefix) => path.startsWith(prefix));
+}
+
+process.stdout.write('Staging changes (tracked + safe new files)...\n');
+// Stage modifications/deletions of tracked files.
+run('git', ['add', '-u']);
+
+// Only add new files in whitelisted locations.
+const untracked = output('git', ['ls-files', '--others', '--exclude-standard']);
+if (untracked) {
+  const safeUntracked = untracked
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter(isSafeNewFilePath);
+
+  if (safeUntracked.length > 0) {
+    run('git', ['add', '--', ...safeUntracked]);
+  }
+}
 
 const statusAfterAdd = output('git', ['status', '--porcelain']);
 if (!statusAfterAdd) {
