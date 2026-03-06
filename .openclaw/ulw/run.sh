@@ -130,7 +130,11 @@ if [[ "${HEAD_AFTER}" == "${HEAD_BEFORE}" ]]; then
     # Try to infer TASK id from modified backlog task specs.
     MOD_TASK_FILE="$(git -C "${ROOT}" diff --name-only | (command -v rg >/dev/null 2>&1 && rg '^backlog/tasks/.*\.md$' -m 1 || grep -E '^backlog/tasks/.*\.md$' | head -n 1) || true)"
     if [[ -n "${MOD_TASK_FILE}" ]]; then
-      TASK_ID_LINE="$(rg -n '^id:\s*' "${ROOT}/${MOD_TASK_FILE}" -m 1 2>/dev/null || true)"
+      if command -v rg >/dev/null 2>&1; then
+        TASK_ID_LINE="$(rg -n '^id:\s*' "${ROOT}/${MOD_TASK_FILE}" -m 1 2>/dev/null || true)"
+      else
+        TASK_ID_LINE="$(grep -nE '^id:\s*' "${ROOT}/${MOD_TASK_FILE}" | head -n 1 2>/dev/null || true)"
+      fi
       TASK_ID="${TASK_ID_LINE#*:}"
       TASK_ID="${TASK_ID#id:}"
       TASK_ID="${TASK_ID//[[:space:]]/}"
