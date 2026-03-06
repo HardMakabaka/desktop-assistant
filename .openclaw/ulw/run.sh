@@ -157,13 +157,20 @@ if [[ "${HEAD_AFTER}" != "${HEAD_BEFORE}" ]]; then
   fi
 
   if command -v gh >/dev/null 2>&1; then
-    if gh pr view --head "${WORKING_BRANCH}" >/dev/null 2>&1; then
-      :
+    # gh pr view doesn't support --head on some versions; use pr list for head-branch detection.
+    PR_URL="$(gh pr list --head "${WORKING_BRANCH}" --base "${BASE_BRANCH}" --state open --json url --limit 1 --jq '.[0].url' 2>/dev/null || true)"
+    if [[ -n "${PR_URL}" ]]; then
+      echo "ULW: PR exists: ${PR_URL}"
     else
-      gh pr create --draft --base "${BASE_BRANCH}" --head "${WORKING_BRANCH}" \
+      PR_URL="$(gh pr create --draft --base "${BASE_BRANCH}" --head "${WORKING_BRANCH}" \
         --title "ULW: backlog progress (${TS})" \
         --body "Automated scheduled run.\n\nArtifacts: ${ART_DIR}\n" \
-        >/dev/null 2>&1 || echo "ULW: gh pr create failed; please create PR manually." >&2
+        2>/dev/null || true)"
+      if [[ -n "${PR_URL}" ]]; then
+        echo "ULW: PR created: ${PR_URL}"
+      else
+        echo "ULW: gh pr create failed; please create PR manually." >&2
+      fi
     fi
   fi
 fi
