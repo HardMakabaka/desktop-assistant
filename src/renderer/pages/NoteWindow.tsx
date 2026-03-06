@@ -741,23 +741,6 @@ export function NoteWindow() {
         <div style={styles.headerActions}>
           <button
             style={styles.iconBtn}
-            onClick={handleDelete}
-            disabled={actionBusy}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = 'rgba(229,57,53,0.15)';
-              e.currentTarget.style.color = '#e53935';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = 'rgba(0,0,0,0.5)';
-            }}
-            title="移入垃圾桶"
-            aria-label="移入垃圾桶"
-          >
-            🗑
-          </button>
-          <button
-            style={styles.iconBtn}
             onClick={handleClose}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
