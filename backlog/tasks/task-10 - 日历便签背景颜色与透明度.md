@@ -1,7 +1,7 @@
 ---
 id: TASK-10
 title: 日历/便签背景颜色与透明度调节
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-06 18:56'
 updated_date: '2026-03-06 18:56'

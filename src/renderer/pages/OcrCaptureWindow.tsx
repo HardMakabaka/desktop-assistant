@@ -4,6 +4,10 @@ import type { OcrResultPayload } from '../../shared/types';
 
 type Rect = { x: number; y: number; w: number; h: number };
 
+type OcrPhase = 'init' | 'download-confirm' | 'downloading' | 'ready' | 'selecting' | 'recognizing';
+
+const LANG_DOWNLOADED_KEY = 'desktop-assistant:ocr:lang-downloaded';
+
 function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
@@ -14,6 +18,20 @@ function rectFromPoints(ax: number, ay: number, bx: number, by: number): Rect {
   const x2 = Math.max(ax, bx);
   const y2 = Math.max(ay, by);
   return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+}
+
+function isLangCached(): boolean {
+  try {
+    return window.localStorage.getItem(LANG_DOWNLOADED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markLangCached(): void {
+  try {
+    window.localStorage.setItem(LANG_DOWNLOADED_KEY, '1');
+  } catch { /* */ }
 }
 
 const styles = {
@@ -90,7 +108,88 @@ const styles = {
     fontSize: 12,
     color: 'rgba(255,255,255,0.85)',
   },
+  centerDialog: {
+    position: 'absolute' as const,
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'rgba(0,0,0,0.6)',
+    zIndex: 50,
+  },
+  dialogBox: {
+    background: 'rgba(30,30,30,0.95)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: 14,
+    padding: '24px 28px',
+    maxWidth: 380,
+    textAlign: 'center' as const,
+    backdropFilter: 'blur(12px)',
+  },
+  dialogTitle: {
+    fontSize: 15,
+    fontWeight: 700 as const,
+    marginBottom: 10,
+    color: 'rgba(255,255,255,0.92)',
+  },
+  dialogText: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 1.6,
+    marginBottom: 16,
+  },
+  dialogActions: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  progressBar: {
+    width: '100%',
+    height: 6,
+    borderRadius: 3,
+    background: 'rgba(255,255,255,0.1)',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+    background: 'rgba(45,212,191,0.8)',
+    transition: 'width 0.3s ease',
+  },
 };
+
+/** Friendly error messages based on error type */
+function friendlyError(err: unknown, context: string): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const lower = msg.toLowerCase();
+
+  if (context === 'capture') {
+    if (lower.includes('not supported') || lower.includes('getdisplaymedia') || lower.includes('not allowed') || lower.includes('not found')) {
+      return '当前系统不支持屏幕截图。如果使用 Wayland 桌面，请尝试切换到 X11 桌面环境，或确认已安装 PipeWire + xdg-desktop-portal。';
+    }
+    if (lower.includes('denied') || lower.includes('permission') || lower.includes('dismissed') || lower.includes('cancel')) {
+      return '屏幕截图权限被拒绝。请在系统设置中允许屏幕录制/截图权限后重试。';
+    }
+    return `截图失败：${msg}`;
+  }
+
+  if (context === 'download') {
+    if (lower.includes('network') || lower.includes('fetch') || lower.includes('failed to fetch') || lower.includes('load')) {
+      return '语言包下载失败，请检查网络连接后点击"重试"。';
+    }
+    return `语言包下载失败：${msg}`;
+  }
+
+  if (context === 'recognize') {
+    if (lower.includes('timeout') || lower.includes('超时')) {
+      return '识别超时，请尝试选择更小的区域后重试。';
+    }
+    return `识别失败：${msg}`;
+  }
+
+  return msg;
+}
 
 export function OcrCaptureWindow() {
   const noteId = useMemo(() => new URLSearchParams(window.location.search).get('noteId') || '', []);
@@ -98,18 +197,21 @@ export function OcrCaptureWindow() {
   const workerRef = useRef<Worker | null>(null);
   const dragRef = useRef<{ active: boolean; ax: number; ay: number }>({ active: false, ax: 0, ay: 0 });
 
+  const [phase, setPhase] = useState<OcrPhase>('init');
   const [screenshotURL, setScreenshotURL] = useState<string>('');
   const [screenshotReady, setScreenshotReady] = useState(false);
   const [selection, setSelection] = useState<Rect | null>(null);
   const [busy, setBusy] = useState(false);
-  const [hint, setHint] = useState('选择屏幕后拖拽框选要识别的区域');
+  const [hint, setHint] = useState('');
   const [progress, setProgress] = useState<string>('');
+  const [progressPct, setProgressPct] = useState(0);
   const [error, setError] = useState<string>('');
 
   const cleanupScreenshot = useCallback(() => {
     setScreenshotReady(false);
     setSelection(null);
     setProgress('');
+    setProgressPct(0);
     setError('');
     if (screenshotURL) URL.revokeObjectURL(screenshotURL);
     setScreenshotURL('');
@@ -131,7 +233,8 @@ export function OcrCaptureWindow() {
     await window.desktopAPI.closeWindow();
   }, [closeWithResult, noteId]);
 
-  const ensureWorker = useCallback(async (): Promise<Worker> => {
+  // ---- Worker initialization with download confirmation ----
+  const initWorker = useCallback(async (): Promise<Worker> => {
     if (workerRef.current) return workerRef.current;
 
     const worker = await createWorker(['chi_sim'], 1, {
@@ -139,8 +242,14 @@ export function OcrCaptureWindow() {
       corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@v5.0.0',
       langPath: 'https://tessdata.projectnaptha.com/4.0.0',
       logger: (m: { status?: string; progress?: number }) => {
+        if (typeof m.progress === 'number') {
+          const pct = Math.round(m.progress * 100);
+          setProgressPct(pct);
+        }
         if (m.status === 'recognizing text' && typeof m.progress === 'number') {
           setProgress(`识别中... ${Math.round(m.progress * 100)}%`);
+        } else if (m.status === 'loading language traineddata' && typeof m.progress === 'number') {
+          setProgress(`下载语言包... ${Math.round(m.progress * 100)}%`);
         } else if (m.status && typeof m.progress === 'number') {
           setProgress(`${m.status} ${Math.round(m.progress * 100)}%`);
         } else if (m.status) {
@@ -150,15 +259,36 @@ export function OcrCaptureWindow() {
     });
 
     workerRef.current = worker;
+    markLangCached();
     return worker;
   }, []);
 
+  // ---- Download phase: pre-download worker before screenshot ----
+  const startDownloadAndProceed = useCallback(async () => {
+    setPhase('downloading');
+    setError('');
+    setProgress('正在下载语言包...');
+    setProgressPct(0);
+
+    try {
+      await initWorker();
+      setProgress('');
+      // Proceed to screenshot
+      setPhase('ready');
+    } catch (err) {
+      setError(friendlyError(err, 'download'));
+      setProgress('');
+      setPhase('download-confirm'); // show retry
+    }
+  }, [initWorker]);
+
+  // ---- Screenshot ----
   const takeScreenshot = useCallback(async () => {
     cleanupScreenshot();
     setHint('正在请求屏幕权限...');
 
     if (!navigator.mediaDevices?.getDisplayMedia) {
-      setError('当前环境不支持屏幕截图（缺少 getDisplayMedia）');
+      setError('当前系统不支持屏幕截图。如果使用 Wayland 桌面，请尝试切换到 X11 桌面环境，或确认已安装 PipeWire + xdg-desktop-portal。');
       setHint('');
       return;
     }
@@ -167,8 +297,7 @@ export function OcrCaptureWindow() {
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
     } catch (err) {
-      const message = err instanceof Error && err.message ? err.message : '权限不足或已取消';
-      setError(`截图失败：${message}`);
+      setError(friendlyError(err, 'capture'));
       setHint('');
       return;
     }
@@ -188,33 +317,52 @@ export function OcrCaptureWindow() {
       const width = video.videoWidth || 0;
       const height = video.videoHeight || 0;
       if (!width || !height) {
-        throw new Error('截图失败：无法获取屏幕尺寸');
+        throw new Error('无法获取屏幕尺寸');
       }
 
       const canvas = document.createElement('canvas');
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('截图失败：无法创建画布');
+      if (!ctx) throw new Error('无法创建画布');
       ctx.drawImage(video, 0, 0, width, height);
 
       const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob(b => (b ? resolve(b) : reject(new Error('截图失败：生成图片失败'))), 'image/png');
+        canvas.toBlob(b => (b ? resolve(b) : reject(new Error('生成图片失败'))), 'image/png');
       });
 
       const url = URL.createObjectURL(blob);
       setScreenshotURL(url);
       setHint('拖拽框选要识别的区域（Esc 取消）');
       setError('');
+      setPhase('selecting');
     } catch (err) {
-      const message = err instanceof Error && err.message ? err.message : '未知错误';
-      setError(message);
+      setError(friendlyError(err, 'capture'));
       setHint('');
     } finally {
       stream?.getTracks().forEach(t => t.stop());
     }
   }, [cleanupScreenshot]);
 
+  // ---- Phase transitions ----
+  useEffect(() => {
+    if (phase === 'init') {
+      if (isLangCached()) {
+        // Language data previously downloaded, skip confirmation
+        setPhase('ready');
+      } else {
+        setPhase('download-confirm');
+      }
+    }
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase === 'ready') {
+      void takeScreenshot();
+    }
+  }, [phase, takeScreenshot]);
+
+  // ---- Recognition ----
   const mapViewportRectToImageRect = useCallback((rect: Rect): Rect | null => {
     const img = imgRef.current;
     if (!img || !img.naturalWidth || !img.naturalHeight) return null;
@@ -260,6 +408,7 @@ export function OcrCaptureWindow() {
     }
 
     setBusy(true);
+    setPhase('recognizing');
     setError('');
     setProgress('准备识别...');
 
@@ -269,8 +418,9 @@ export function OcrCaptureWindow() {
     const ctx = cropCanvas.getContext('2d');
     if (!ctx) {
       setBusy(false);
+      setPhase('selecting');
       setProgress('');
-      setError('识别失败：无法创建画布');
+      setError('无法创建画布，请重试');
       return;
     }
 
@@ -288,7 +438,7 @@ export function OcrCaptureWindow() {
 
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     try {
-      const worker = await ensureWorker();
+      const worker = await initWorker();
       const result = await Promise.race([
         worker.recognize(cropCanvas),
         new Promise<never>((_resolve, reject) => {
@@ -298,8 +448,9 @@ export function OcrCaptureWindow() {
 
       const text = (result as { data?: { text?: string } }).data?.text?.trim() || '';
       if (!text) {
-        setError('未识别到文字（结果为空）');
+        setError('未识别到文字（结果为空），请尝试框选更清晰的区域');
         setBusy(false);
+        setPhase('selecting');
         setProgress('');
         return;
       }
@@ -307,11 +458,12 @@ export function OcrCaptureWindow() {
       await closeWithResult({ noteId, ok: true, text });
       await window.desktopAPI.closeWindow();
     } catch (err) {
-      const message = err instanceof Error && err.message ? err.message : '未知错误';
-      await closeWithResult({ noteId, ok: false, message: `识别失败：${message}` });
-      setError(`识别失败：${message}`);
+      const message = friendlyError(err, 'recognize');
+      await closeWithResult({ noteId, ok: false, message });
+      setError(message);
       setProgress('');
       setBusy(false);
+      setPhase('selecting');
 
       if (workerRef.current) {
         try {
@@ -324,27 +476,37 @@ export function OcrCaptureWindow() {
     } finally {
       if (timeoutId) clearTimeout(timeoutId);
     }
-  }, [busy, closeWithResult, ensureWorker, mapViewportRectToImageRect, noteId, selection]);
+  }, [busy, closeWithResult, initWorker, mapViewportRectToImageRect, noteId, selection]);
 
-  useEffect(() => {
-    void takeScreenshot();
-  }, [takeScreenshot]);
+  // ---- Retry handler ----
+  const handleRetry = useCallback(() => {
+    setError('');
+    setProgress('');
+    if (phase === 'download-confirm' || phase === 'downloading') {
+      void startDownloadAndProceed();
+    } else {
+      // Retry screenshot
+      setPhase('ready');
+    }
+  }, [phase, startDownloadAndProceed]);
 
+  // ---- Keyboard shortcuts ----
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         void cancelAndClose();
       }
-      if (e.key === 'Enter' && selection && !busy) {
+      if (e.key === 'Enter' && selection && !busy && phase === 'selecting') {
         e.preventDefault();
         void recognizeSelection();
       }
     };
     window.addEventListener('keydown', onKeyDown, true);
     return () => window.removeEventListener('keydown', onKeyDown, true);
-  }, [busy, cancelAndClose, recognizeSelection, selection]);
+  }, [busy, cancelAndClose, recognizeSelection, selection, phase]);
 
+  // ---- Cleanup ----
   useEffect(() => {
     return () => {
       cleanupScreenshot();
@@ -355,8 +517,9 @@ export function OcrCaptureWindow() {
     };
   }, [cleanupScreenshot]);
 
+  // ---- Mouse drag for selection ----
   const onMouseDown = (e: React.MouseEvent) => {
-    if (!screenshotReady || busy) return;
+    if (!screenshotReady || busy || phase !== 'selecting') return;
     dragRef.current = { active: true, ax: e.clientX, ay: e.clientY };
     setSelection({ x: e.clientX, y: e.clientY, w: 0, h: 0 });
   };
@@ -382,6 +545,70 @@ export function OcrCaptureWindow() {
       }
     : null;
 
+  // ---- Download confirmation dialog ----
+  if (phase === 'download-confirm') {
+    return (
+      <div style={styles.root}>
+        <div style={styles.centerDialog}>
+          <div style={styles.dialogBox}>
+            <div style={styles.dialogTitle}>📦 需要下载 OCR 语言包</div>
+            <div style={styles.dialogText}>
+              首次使用 OCR 需要下载中文识别语言包（约 15MB）。
+              <br />下载完成后将自动进入截图识别。
+            </div>
+            {error ? (
+              <div style={{ fontSize: 12, color: 'rgba(255,120,120,0.95)', marginBottom: 12, lineHeight: 1.5 }}>
+                {error}
+              </div>
+            ) : null}
+            <div style={styles.dialogActions}>
+              <button
+                style={styles.btn}
+                onClick={() => void cancelAndClose()}
+              >
+                取消
+              </button>
+              <button
+                style={{ ...styles.btn, ...styles.btnPrimary }}
+                onClick={() => void startDownloadAndProceed()}
+              >
+                {error ? '重试下载' : '开始下载'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Downloading phase ----
+  if (phase === 'downloading') {
+    return (
+      <div style={styles.root}>
+        <div style={styles.centerDialog}>
+          <div style={styles.dialogBox}>
+            <div style={styles.dialogTitle}>⏳ 正在下载语言包</div>
+            <div style={styles.progressBar}>
+              <div style={{ ...styles.progressFill, width: `${progressPct}%` }} />
+            </div>
+            <div style={styles.dialogText}>
+              {progress || '准备中...'}
+            </div>
+            <div style={styles.dialogActions}>
+              <button
+                style={styles.btn}
+                onClick={() => void cancelAndClose()}
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Main OCR UI (screenshot + selection) ----
   return (
     <div style={styles.root} onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp}>
       {screenshotURL ? (
@@ -412,6 +639,15 @@ export function OcrCaptureWindow() {
         <button style={styles.btn} onClick={() => void cancelAndClose()} disabled={busy}>
           取消
         </button>
+        {error ? (
+          <button
+            style={{ ...styles.btn, border: '1px solid rgba(255,180,120,0.55)', background: 'rgba(255,180,120,0.12)' }}
+            onClick={handleRetry}
+            disabled={busy}
+          >
+            重试
+          </button>
+        ) : null}
         <button
           style={{ ...styles.btn, ...styles.btnPrimary }}
           onClick={() => void recognizeSelection()}
@@ -421,9 +657,8 @@ export function OcrCaptureWindow() {
         </button>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {error ? <div style={{ ...styles.hint, color: 'rgba(255,120,120,0.95)' }}>{error}</div> : null}
-          {progress ? <div style={styles.hint}>{progress}</div> : null}
+          {progress && !error ? <div style={styles.hint}>{progress}</div> : null}
           {!error && !progress ? <div style={styles.hint}>{hint}</div> : null}
-          <div style={styles.subHint}>首次使用可能需要下载语言包（联网）。</div>
         </div>
       </div>
     </div>
