@@ -10,7 +10,12 @@ permissions:
 
 jobs:
   release:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+
+    runs-on: ${{ matrix.os }}
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -29,21 +34,42 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y fakeroot
+
       - name: Typecheck
         run: npm run typecheck
 
       - name: Build
         run: npm run build
 
-      - name: Package & Publish
+      - name: Package & Publish (Windows)
+        if: runner.os == 'Windows'
         run: npx electron-builder --win --x64 --publish always
 
-      - name: Upload workflow artifacts
+      - name: Package & Publish (Linux)
+        if: runner.os == 'Linux'
+        run: npx electron-builder --linux deb --x64 --publish always
+
+      - name: Upload workflow artifacts (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: windows-release-assets
           path: |
             release/*.exe
+            release/*.yml
+            release/*.blockmap
+          if-no-files-found: error
+
+      - name: Upload workflow artifacts (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-assets
+          path: |
+            release/*.deb
             release/*.yml
             release/*.blockmap
           if-no-files-found: error

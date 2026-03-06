@@ -10,6 +10,12 @@ const devServerURL = process.env.DESKTOP_ASSISTANT_DEV_URL || process.env.VITE_D
 const isDev = Boolean(devServerURL);
 const store = new StoreManager();
 
+// Wayland screen capture in Chromium often depends on PipeWire.
+// Enabling this feature makes `getDisplayMedia` more likely to work on Ubuntu/Wayland.
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('enable-features', 'WebRTCPipeWireCapturer');
+}
+
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 const noteWindows = new Map<string, BrowserWindow>();
@@ -305,7 +311,14 @@ async function checkForUpdatesManually(): Promise<UpdateCheckResponse> {
 }
 
 function createTray(): void {
-  const icon = nativeImage.createEmpty();
+  const iconCandidates = [
+    path.join(process.cwd(), 'resources', 'icon.ico'),
+    path.join(process.resourcesPath, 'icon.ico'),
+  ];
+
+  const iconPath = iconCandidates.find(candidate => existsSync(candidate));
+  const loaded = iconPath ? nativeImage.createFromPath(iconPath) : null;
+  const icon = loaded && !loaded.isEmpty() ? loaded : nativeImage.createEmpty();
   tray = new Tray(icon);
   tray.setToolTip('桌面助手');
 

@@ -1,10 +1,10 @@
 ---
 id: TASK-6
 title: Linux Ubuntu 适配与打包验证
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-05 03:37'
-updated_date: '2026-03-05 03:37'
+updated_date: '2026-03-06 10:37'
 labels:
   - linux
   - ubuntu

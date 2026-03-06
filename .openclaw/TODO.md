@@ -27,3 +27,4 @@
 - 2026-03-06T02:49:00Z TASK-5 ok - split trash vs purge with restore flow; verified via `npm run verify`
 - 2026-03-06T04:38:45Z TASK-4 ok - add Tab indent/outdent + customizable note shortcuts; verified via `npm run verify`
 - 2026-03-06T09:24:27Z TASK-3 ok - add OCR screen capture + region select + insert into note; verified via `npm run verify`
+- 2026-03-06T10:37:17Z TASK-6 ok - add Linux deb packaging + Ubuntu notes; verified via `npm run verify` and `npm run pack:linux`
