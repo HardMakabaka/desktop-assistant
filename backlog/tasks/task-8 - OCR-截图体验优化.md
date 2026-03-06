@@ -1,10 +1,10 @@
 ---
 id: TASK-8
 title: OCR 截图体验优化（依赖下载提示 + 错误友好化）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-06 18:56'
-updated_date: '2026-03-06 18:56'
+updated_date: '2026-03-06 20:24'
 labels:
   - ocr
   - ux
@@ -16,6 +16,7 @@ references:
   - src/renderer/pages/OcrCaptureWindow.tsx
   - src/renderer/pages/NoteWindow.tsx
 ---
+
 
 ## Description
 

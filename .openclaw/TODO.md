@@ -29,3 +29,4 @@
 - 2026-03-06T09:24:27Z TASK-3 ok - add OCR screen capture + region select + insert into note; verified via `npm run verify`
 - 2026-03-06T10:37:17Z TASK-6 ok - add Linux deb packaging + Ubuntu notes; verified via `npm run verify` and `npm run pack:linux`
 - 2026-03-06T12:24:28Z TASK-1 ok - close epic + document feature changes for Ubuntu; verified via `npm run verify`
+- 2026-03-06T20:24:46Z TASK-8 ok - improve OCR download prompt, progress, friendly errors, retry; verified via `npm run verify`
