@@ -382,9 +382,11 @@ const styles = {
 
 export function NoteWindow() {
   const [note, setNote] = useState<StickyNote | null>(null);
+  const noteRef = useRef<StickyNote | null>(null);
   const [pinned, setPinned] = useState(false);
   const [actionHint, setActionHint] = useState('');
   const [actionBusy, setActionBusy] = useState(false);
+  const [ocrBusy, setOcrBusy] = useState(false);
   const [livePreviewEnabled, setLivePreviewEnabled] = useState(() => {
     try {
       return window.localStorage.getItem('desktop-assistant:note:live-preview') === '1';
@@ -424,6 +426,10 @@ export function NoteWindow() {
   useEffect(() => {
     loadNote();
   }, [loadNote]);
+
+  useEffect(() => {
+    noteRef.current = note;
+  }, [note]);
 
   useEffect(() => {
     try {
@@ -480,16 +486,82 @@ export function NoteWindow() {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [recordingAction, shortcutDraft]);
 
-  const handleContentChange = (content: string) => {
-    if (!note) return;
-    setNote({ ...note, content });
+  const handleContentChange = useCallback((content: string) => {
+    const current = noteRef.current;
+    if (!current) return;
+    setNote(prev => (prev ? { ...prev, content } : prev));
 
-    // 防抖保存
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      window.desktopAPI.saveNote({ id: note.id, content });
+      window.desktopAPI.saveNote({ id: current.id, content });
     }, 300);
-  };
+  }, []);
+
+  const insertTextAtCursor = useCallback(
+    (text: string) => {
+      const current = noteRef.current;
+      const textarea = textareaRef.current;
+      if (!current || !textarea) return;
+
+      const value = current.content;
+      const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : value.length;
+      const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : value.length;
+      const prefix = value.slice(0, start);
+      const suffix = value.slice(end);
+
+      const needsLeadingNewline = prefix.length > 0 && !prefix.endsWith('\n');
+      const insertion = `${needsLeadingNewline ? '\n' : ''}${text}\n`;
+      const nextValue = prefix + insertion + suffix;
+      handleContentChange(nextValue);
+
+      requestAnimationFrame(() => {
+        if (!textareaRef.current) return;
+        const nextPos = start + insertion.length;
+        textareaRef.current.focus();
+        textareaRef.current.selectionStart = nextPos;
+        textareaRef.current.selectionEnd = nextPos;
+      });
+    },
+    [handleContentChange],
+  );
+
+  useEffect(() => {
+    const unsubscribe = window.desktopAPI.onOcrResult(payload => {
+      const current = noteRef.current;
+      if (!current || payload.noteId !== current.id) return;
+
+      setOcrBusy(false);
+      if (payload.ok) {
+        insertTextAtCursor(payload.text);
+        setActionHint('OCR 识别结果已插入');
+      } else {
+        setActionHint(payload.message || 'OCR 识别失败');
+      }
+    });
+
+    return () => unsubscribe();
+  }, [insertTextAtCursor]);
+
+  const handleOcr = useCallback(async () => {
+    const current = noteRef.current;
+    if (!current) return;
+    if (actionBusy || ocrBusy) return;
+
+    setOcrBusy(true);
+    setActionHint('请在弹出的 OCR 截图窗口中框选区域...');
+
+    try {
+      const ok = await window.desktopAPI.openOcrCapture(current.id);
+      if (!ok) {
+        setOcrBusy(false);
+        setActionHint('打开 OCR 截图失败');
+      }
+    } catch (error) {
+      setOcrBusy(false);
+      const detail = error instanceof Error ? error.message : '打开 OCR 截图失败';
+      setActionHint(detail || '打开 OCR 截图失败');
+    }
+  }, [actionBusy, ocrBusy]);
 
   const handlePin = async () => {
     if (!note) return;
@@ -652,6 +724,18 @@ export function NoteWindow() {
             aria-label="快捷键设置"
           >
             ⌨
+          </button>
+
+          <button
+            style={{ ...styles.iconBtn, fontSize: '11px' }}
+            onClick={() => void handleOcr()}
+            disabled={actionBusy || ocrBusy}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            title="OCR 截图识别文字"
+            aria-label="OCR 截图识别文字"
+          >
+            OCR
           </button>
         </div>
         <div style={styles.headerActions}>

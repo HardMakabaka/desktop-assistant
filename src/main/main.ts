@@ -4,7 +4,7 @@ import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
 import { autoUpdater } from 'electron-updater';
 import { StoreManager } from './store';
-import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse } from '../shared/types';
+import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse, OcrResultPayload } from '../shared/types';
 
 const devServerURL = process.env.DESKTOP_ASSISTANT_DEV_URL || process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(devServerURL);
@@ -14,6 +14,8 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 const noteWindows = new Map<string, BrowserWindow>();
 let calendarWindow: BrowserWindow | null = null;
+let ocrWindow: BrowserWindow | null = null;
+let ocrSession: { noteId: string; reported: boolean } | null = null;
 let cachedPreloadPath: string | null = null;
 let updateDownloaded = false;
 
@@ -214,6 +216,63 @@ function createCalendarWindow(): void {
   });
 }
 
+function sendOcrResultToNote(payload: OcrResultPayload): boolean {
+  const win = noteWindows.get(payload.noteId);
+  if (!win || win.isDestroyed()) return false;
+  win.webContents.send(IPC_CHANNELS.OCR_RESULT, payload);
+  return true;
+}
+
+function createOcrWindow(noteId: string): void {
+  if (ocrWindow && !ocrWindow.isDestroyed()) {
+    ocrWindow.focus();
+    return;
+  }
+
+  ocrSession = { noteId, reported: false };
+
+  ocrWindow = new BrowserWindow({
+    fullscreen: true,
+    frame: false,
+    transparent: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    backgroundColor: '#000000',
+    webPreferences: {
+      preload: getPreloadPath(),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+    title: 'OCR 截图',
+  });
+
+  const ocrURL = new URL(getRendererURL('ocr'));
+  ocrURL.searchParams.set('noteId', noteId);
+  ocrWindow.loadURL(ocrURL.toString());
+  verifyBridge(ocrWindow, 'ocr-window');
+
+  ocrWindow.once('ready-to-show', () => {
+    if (!ocrWindow || ocrWindow.isDestroyed()) return;
+    ocrWindow.show();
+    ocrWindow.focus();
+  });
+
+  ocrWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('[ocr-window] load failed', { errorCode, errorDescription, validatedURL });
+  });
+
+  ocrWindow.on('closed', () => {
+    const session = ocrSession;
+    ocrWindow = null;
+    ocrSession = null;
+
+    if (session && !session.reported) {
+      sendOcrResultToNote({ noteId: session.noteId, ok: false, message: '已取消' });
+    }
+  });
+}
+
 function normalizeUpdaterError(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -365,6 +424,26 @@ function setupIPC(): void {
 
   ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, async () => {
     return checkForUpdatesManually();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.OCR_OPEN_CAPTURE, (_event, noteId: string) => {
+    if (!noteId || typeof noteId !== 'string') return false;
+    createOcrWindow(noteId);
+    return true;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.OCR_SEND_RESULT, (_event, payload: OcrResultPayload) => {
+    if (!payload || typeof payload.noteId !== 'string') return false;
+
+    if (ocrSession && payload.noteId === ocrSession.noteId) {
+      ocrSession.reported = true;
+    }
+
+    const delivered = sendOcrResultToNote(payload);
+    if (ocrWindow && !ocrWindow.isDestroyed()) {
+      ocrWindow.close();
+    }
+    return delivered;
   });
 }
 

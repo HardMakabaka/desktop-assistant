@@ -26,3 +26,4 @@
 - 2026-03-06T00:36:05Z TASK-2 ok - add note markdown live preview toggle; verified via `npm run verify`
 - 2026-03-06T02:49:00Z TASK-5 ok - split trash vs purge with restore flow; verified via `npm run verify`
 - 2026-03-06T04:38:45Z TASK-4 ok - add Tab indent/outdent + customizable note shortcuts; verified via `npm run verify`
+- 2026-03-06T09:24:27Z TASK-3 ok - add OCR screen capture + region select + insert into note; verified via `npm run verify`

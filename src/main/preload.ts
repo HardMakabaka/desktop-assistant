@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { StickyNote, CalendarMark, UpdateCheckResponse } from '../shared/types';
+import type { StickyNote, CalendarMark, UpdateCheckResponse, OcrResultPayload } from '../shared/types';
 
 const IPC_CHANNELS = {
   NOTE_GET_ALL: 'note:get-all',
@@ -17,6 +17,10 @@ const IPC_CHANNELS = {
   WINDOW_OPEN_NOTE: 'window:open-note',
   WINDOW_OPEN_CALENDAR: 'window:open-calendar',
   UPDATE_CHECK: 'update:check',
+
+  OCR_OPEN_CAPTURE: 'ocr:open-capture',
+  OCR_SEND_RESULT: 'ocr:send-result',
+  OCR_RESULT: 'ocr:result',
 } as const;
 
 const api = {
@@ -45,6 +49,15 @@ const api = {
     ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_NOTE, noteId),
   openCalendar: (): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_CALENDAR),
   checkForUpdates: (): Promise<UpdateCheckResponse> => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
+
+  openOcrCapture: (noteId: string): Promise<boolean> => ipcRenderer.invoke(IPC_CHANNELS.OCR_OPEN_CAPTURE, noteId),
+  sendOcrResult: (payload: OcrResultPayload): Promise<boolean> =>
+    ipcRenderer.invoke(IPC_CHANNELS.OCR_SEND_RESULT, payload),
+  onOcrResult: (handler: (payload: OcrResultPayload) => void): (() => void) => {
+    const listener = (_event: unknown, payload: OcrResultPayload) => handler(payload);
+    ipcRenderer.on(IPC_CHANNELS.OCR_RESULT, listener);
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.OCR_RESULT, listener);
+  },
 };
 
 try {

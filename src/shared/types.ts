@@ -25,6 +25,10 @@ export interface UpdateCheckResponse {
   message: string;
 }
 
+export type OcrResultPayload =
+  | { noteId: string; ok: true; text: string }
+  | { noteId: string; ok: false; message: string };
+
 /** IPC 频道 */
 export const IPC_CHANNELS = {
   // 便签
@@ -45,4 +49,7 @@ export const IPC_CHANNELS = {
   WINDOW_OPEN_NOTE: 'window:open-note',
   WINDOW_OPEN_CALENDAR: 'window:open-calendar',
   UPDATE_CHECK: 'update:check',
+  OCR_OPEN_CAPTURE: 'ocr:open-capture',
+  OCR_SEND_RESULT: 'ocr:send-result',
+  OCR_RESULT: 'ocr:result',
 } as const;

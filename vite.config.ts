@@ -9,14 +9,15 @@ export default defineConfig({
   build: {
     outDir: resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
-    rollupOptions: {
-      input: {
-        main: resolve(__dirname, 'src/renderer/index.html'),
-        note: resolve(__dirname, 'src/renderer/note.html'),
-        calendar: resolve(__dirname, 'src/renderer/calendar.html'),
+      rollupOptions: {
+        input: {
+          main: resolve(__dirname, 'src/renderer/index.html'),
+          note: resolve(__dirname, 'src/renderer/note.html'),
+          calendar: resolve(__dirname, 'src/renderer/calendar.html'),
+          ocr: resolve(__dirname, 'src/renderer/ocr.html'),
+        },
       },
     },
-  },
   server: {
     port: 5173,
     strictPort: true,

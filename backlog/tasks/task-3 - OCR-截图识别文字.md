@@ -1,10 +1,10 @@
 ---
 id: TASK-3
 title: OCR 截图识别文字
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-05 03:36'
-updated_date: '2026-03-05 03:36'
+updated_date: '2026-03-06 09:19'
 labels:
   - ocr
   - note
