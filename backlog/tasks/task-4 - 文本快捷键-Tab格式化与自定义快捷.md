@@ -1,10 +1,10 @@
 ---
 id: TASK-4
 title: 文本快捷键（Tab 格式化 + 自定义快捷）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-05 03:36'
-updated_date: '2026-03-05 03:36'
+updated_date: '2026-03-06 04:38'
 labels:
   - shortcut
   - editor

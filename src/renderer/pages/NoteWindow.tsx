@@ -86,9 +86,187 @@ function renderMarkdownToSafeHtml(markdown: string): string {
   return html;
 }
 
+type NoteShortcutAction = 'toggleLivePreview' | 'togglePin' | 'moveToTrash';
+type NoteShortcutConfig = Record<NoteShortcutAction, string>;
+
+const NOTE_SHORTCUTS_STORAGE_KEY = 'desktop-assistant:note:shortcuts-v1';
+const NOTE_INDENT = '  ';
+
+function getDefaultNoteShortcuts(): NoteShortcutConfig {
+  return {
+    toggleLivePreview: 'Mod+Shift+P',
+    togglePin: 'Mod+Shift+K',
+    moveToTrash: 'Mod+Shift+Backspace',
+  };
+}
+
+function normalizeShortcutKey(key: string): string {
+  if (key === ' ') return 'Space';
+  if (key.length === 1) return key.toUpperCase();
+  return key;
+}
+
+function shortcutFromKeyboardEvent(e: KeyboardEvent): string | null {
+  const isMod = e.ctrlKey || e.metaKey;
+  if (!isMod) return null;
+
+  const key = normalizeShortcutKey(e.key);
+  if (key === 'Control' || key === 'Meta' || key === 'Alt' || key === 'Shift') return null;
+  if (key === 'Tab') return null;
+
+  const parts: string[] = ['Mod'];
+  if (e.altKey) parts.push('Alt');
+  if (e.shiftKey) parts.push('Shift');
+  parts.push(key);
+  return parts.join('+');
+}
+
+function isReservedSystemShortcut(e: KeyboardEvent): boolean {
+  const isMod = e.ctrlKey || e.metaKey;
+  if (!isMod) return false;
+
+  const key = normalizeShortcutKey(e.key);
+  return key === 'C' || key === 'V' || key === 'X' || key === 'A' || key === 'Z' || key === 'Y';
+}
+
+function validateShortcutConfig(config: NoteShortcutConfig): string | null {
+  const seen = new Map<string, NoteShortcutAction>();
+  for (const action of Object.keys(config) as NoteShortcutAction[]) {
+    const shortcut = (config[action] || '').trim();
+    if (!shortcut) return '快捷键不能为空';
+    if (!shortcut.startsWith('Mod+')) return '快捷键必须包含 Mod（Ctrl/Cmd）';
+
+    const existing = seen.get(shortcut);
+    if (existing && existing !== action) {
+      return `快捷键冲突：${existing} 与 ${action}`;
+    }
+    seen.set(shortcut, action);
+
+    const parts = shortcut.split('+').map(p => p.trim()).filter(Boolean);
+    const key = parts[parts.length - 1];
+    if (key === 'Tab') return 'Tab 被用于缩进格式化，不能设置为快捷键';
+    if (key === 'C' || key === 'V' || key === 'X' || key === 'A' || key === 'Z' || key === 'Y') {
+      return '不能覆盖系统常用快捷键（复制/粘贴/撤销等）';
+    }
+  }
+  return null;
+}
+
+function loadShortcutConfigFromStorage(): NoteShortcutConfig {
+  const defaults = getDefaultNoteShortcuts();
+  try {
+    const raw = window.localStorage.getItem(NOTE_SHORTCUTS_STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) as Partial<NoteShortcutConfig>;
+    const next: NoteShortcutConfig = {
+      toggleLivePreview: (parsed.toggleLivePreview ?? defaults.toggleLivePreview).toString(),
+      togglePin: (parsed.togglePin ?? defaults.togglePin).toString(),
+      moveToTrash: (parsed.moveToTrash ?? defaults.moveToTrash).toString(),
+    };
+    const err = validateShortcutConfig(next);
+    return err ? defaults : next;
+  } catch (error) {
+    console.warn('[note-window] failed to load shortcut config', error);
+    return defaults;
+  }
+}
+
+function persistShortcutConfigToStorage(config: NoteShortcutConfig): void {
+  window.localStorage.setItem(NOTE_SHORTCUTS_STORAGE_KEY, JSON.stringify(config));
+}
+
+function applyIndentFormatting(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  indent: string,
+): { value: string; selectionStart: number; selectionEnd: number } {
+  const hasMultiline = value.slice(selectionStart, selectionEnd).includes('\n');
+  if (!hasMultiline) {
+    const nextValue = value.slice(0, selectionStart) + indent + value.slice(selectionEnd);
+    const delta = indent.length;
+    return {
+      value: nextValue,
+      selectionStart: selectionStart + delta,
+      selectionEnd: selectionStart + delta,
+    };
+  }
+
+  const blockStart = value.lastIndexOf('\n', Math.max(0, selectionStart - 1)) + 1;
+  const blockEndCandidate = value.indexOf('\n', selectionEnd);
+  const blockEnd = blockEndCandidate === -1 ? value.length : blockEndCandidate;
+  const block = value.slice(blockStart, blockEnd);
+  const lines = block.split('\n');
+  const nextBlock = lines.map(line => indent + line).join('\n');
+  const nextValue = value.slice(0, blockStart) + nextBlock + value.slice(blockEnd);
+
+  const deltaPerLine = indent.length;
+  const totalDelta = deltaPerLine * lines.length;
+  return {
+    value: nextValue,
+    selectionStart: selectionStart + deltaPerLine,
+    selectionEnd: selectionEnd + totalDelta,
+  };
+}
+
+function applyOutdentFormatting(
+  value: string,
+  selectionStart: number,
+  selectionEnd: number,
+  indent: string,
+): { value: string; selectionStart: number; selectionEnd: number } {
+  const hasMultiline = value.slice(selectionStart, selectionEnd).includes('\n');
+
+  const blockStart = value.lastIndexOf('\n', Math.max(0, selectionStart - 1)) + 1;
+  const blockEndCandidate = value.indexOf('\n', selectionEnd);
+  const blockEnd = blockEndCandidate === -1 ? value.length : blockEndCandidate;
+  const block = value.slice(blockStart, blockEnd);
+  const lines = block.split('\n');
+
+  let removedBeforeSelectionStart = 0;
+  let removedTotal = 0;
+
+  const nextLines = lines.map((line, idx) => {
+    let removed = 0;
+    if (line.startsWith(indent)) {
+      removed = indent.length;
+      line = line.slice(indent.length);
+    } else if (line.startsWith('\t')) {
+      removed = 1;
+      line = line.slice(1);
+    } else if (line.startsWith(' ')) {
+      removed = 1;
+      line = line.slice(1);
+    }
+
+    removedTotal += removed;
+    if (idx === 0 && selectionStart > blockStart) {
+      removedBeforeSelectionStart += removed;
+    }
+
+    return line;
+  });
+
+  const nextBlock = nextLines.join('\n');
+  const nextValue = value.slice(0, blockStart) + nextBlock + value.slice(blockEnd);
+
+  if (!hasMultiline) {
+    const removed = Math.min(indent.length, removedTotal);
+    const nextPos = Math.max(blockStart, selectionStart - removed);
+    return { value: nextValue, selectionStart: nextPos, selectionEnd: nextPos };
+  }
+
+  return {
+    value: nextValue,
+    selectionStart: Math.max(blockStart, selectionStart - removedBeforeSelectionStart),
+    selectionEnd: Math.max(blockStart, selectionEnd - removedTotal),
+  };
+}
+
 const styles = {
   container: {
     height: '100vh',
+    position: 'relative' as const,
     display: 'flex',
     flexDirection: 'column' as const,
     borderRadius: '10px',
@@ -149,6 +327,57 @@ const styles = {
     color: 'rgba(0,0,0,0.3)',
     textAlign: 'right' as const,
   },
+  modalOverlay: {
+    position: 'absolute' as const,
+    inset: 0,
+    background: 'rgba(0,0,0,0.25)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '14px',
+    WebkitAppRegion: 'no-drag' as unknown as string,
+  },
+  modal: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 12,
+    background: 'rgba(255,255,255,0.96)',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
+    padding: '12px 12px 10px',
+  },
+  modalTitle: {
+    fontSize: 13,
+    fontWeight: 700,
+    margin: '0 0 10px',
+    color: 'rgba(0,0,0,0.82)',
+  },
+  shortcutRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    padding: '6px 0',
+    borderTop: '1px solid rgba(0,0,0,0.06)',
+  },
+  shortcutLabel: {
+    fontSize: 12,
+    color: 'rgba(0,0,0,0.7)',
+  },
+  shortcutValue: {
+    fontSize: 12,
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    color: 'rgba(0,0,0,0.82)',
+    background: 'rgba(0,0,0,0.06)',
+    padding: '2px 6px',
+    borderRadius: 6,
+    userSelect: 'text' as const,
+  },
+  modalActions: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginTop: 10,
+  },
 };
 
 export function NoteWindow() {
@@ -164,6 +393,18 @@ export function NoteWindow() {
       return false;
     }
   });
+  const [shortcuts, setShortcuts] = useState<NoteShortcutConfig>(() => {
+    try {
+      return loadShortcutConfigFromStorage();
+    } catch (error) {
+      console.warn('[note-window] failed to init shortcuts', error);
+      return getDefaultNoteShortcuts();
+    }
+  });
+  const [shortcutModalOpen, setShortcutModalOpen] = useState(false);
+  const [shortcutDraft, setShortcutDraft] = useState<NoteShortcutConfig>(() => getDefaultNoteShortcuts());
+  const [recordingAction, setRecordingAction] = useState<NoteShortcutAction | null>(null);
+  const [recordingHint, setRecordingHint] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -197,6 +438,47 @@ export function NoteWindow() {
       textareaRef.current.focus();
     }
   }, [note]);
+
+  useEffect(() => {
+    if (!recordingAction) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setRecordingAction(null);
+        setRecordingHint('');
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const shortcut = shortcutFromKeyboardEvent(e);
+      if (!shortcut) {
+        setRecordingHint('请按下包含 Mod（Ctrl/Cmd）的组合键');
+        return;
+      }
+      if (isReservedSystemShortcut(e)) {
+        setRecordingHint('不能覆盖系统常用快捷键（复制/粘贴/撤销等）');
+        return;
+      }
+
+      const nextDraft = { ...shortcutDraft, [recordingAction]: shortcut };
+      const err = validateShortcutConfig(nextDraft);
+      if (err) {
+        setRecordingHint(err);
+        return;
+      }
+
+      setShortcutDraft(nextDraft);
+      setRecordingAction(null);
+      setRecordingHint('');
+    };
+
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [recordingAction, shortcutDraft]);
 
   const handleContentChange = (content: string) => {
     if (!note) return;
@@ -249,6 +531,72 @@ export function NoteWindow() {
     window.desktopAPI.closeWindow();
   };
 
+  const openShortcutModal = () => {
+    setShortcutDraft(shortcuts);
+    setRecordingAction(null);
+    setRecordingHint('');
+    setShortcutModalOpen(true);
+  };
+
+  const saveShortcutDraft = () => {
+    const err = validateShortcutConfig(shortcutDraft);
+    if (err) {
+      window.alert(err);
+      return;
+    }
+
+    try {
+      persistShortcutConfigToStorage(shortcutDraft);
+      setShortcuts(shortcutDraft);
+      setShortcutModalOpen(false);
+    } catch (error) {
+      console.warn('[note-window] failed to persist shortcuts', error);
+      window.alert('保存快捷键失败');
+    }
+  };
+
+  const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (!note) return;
+
+    if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      const textarea = e.currentTarget;
+      const { value, selectionStart, selectionEnd } = textarea;
+      const next = e.shiftKey
+        ? applyOutdentFormatting(value, selectionStart, selectionEnd, NOTE_INDENT)
+        : applyIndentFormatting(value, selectionStart, selectionEnd, NOTE_INDENT);
+      handleContentChange(next.value);
+      requestAnimationFrame(() => {
+        if (!textareaRef.current) return;
+        textareaRef.current.selectionStart = next.selectionStart;
+        textareaRef.current.selectionEnd = next.selectionEnd;
+      });
+      return;
+    }
+
+    if (!e.ctrlKey && !e.metaKey) return;
+    if (isReservedSystemShortcut(e.nativeEvent)) return;
+
+    const shortcut = shortcutFromKeyboardEvent(e.nativeEvent);
+    if (!shortcut) return;
+
+    const action = (Object.keys(shortcuts) as NoteShortcutAction[]).find(a => shortcuts[a] === shortcut);
+    if (!action) return;
+
+    e.preventDefault();
+    if (action === 'toggleLivePreview') {
+      setLivePreviewEnabled(v => !v);
+      return;
+    }
+    if (action === 'togglePin') {
+      void handlePin();
+      return;
+    }
+    if (action === 'moveToTrash') {
+      void handleDelete();
+    }
+  };
+
   if (!note) return null;
 
   const darkenColor = (hex: string, amount: number): string => {
@@ -294,6 +642,17 @@ export function NoteWindow() {
           >
             {livePreviewEnabled ? '源码' : '预览'}
           </button>
+
+          <button
+            style={styles.iconBtn}
+            onClick={openShortcutModal}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            title="快捷键设置"
+            aria-label="快捷键设置"
+          >
+            ⌨
+          </button>
         </div>
         <div style={styles.headerActions}>
           <button
@@ -332,6 +691,7 @@ export function NoteWindow() {
           style={styles.textarea}
           value={note.content}
           onChange={e => handleContentChange(e.target.value)}
+          onKeyDown={handleTextareaKeyDown}
           placeholder="在这里写点什么..."
           aria-label="便签内容"
           disabled={actionBusy}
@@ -350,6 +710,127 @@ export function NoteWindow() {
         <span>{actionHint}</span>
         <span>{new Date(note.updatedAt).toLocaleString('zh-CN')}</span>
       </div>
+
+      {shortcutModalOpen ? (
+        <div
+          style={styles.modalOverlay}
+          onClick={() => {
+            if (recordingAction) return;
+            setShortcutModalOpen(false);
+          }}
+          role="dialog"
+          aria-label="快捷键设置"
+        >
+          <div
+            style={styles.modal}
+            onClick={e => e.stopPropagation()}
+            aria-label="快捷键设置面板"
+          >
+            <div style={styles.modalTitle}>快捷键设置</div>
+
+            <div style={{ fontSize: 11, color: 'rgba(0,0,0,0.55)', marginBottom: 6 }}>
+              {recordingAction
+                ? '按下组合键以设置（Esc 取消）。'
+                : '仅支持包含 Mod（Ctrl/Cmd）的组合键，避免影响输入。'}
+            </div>
+            {recordingHint ? (
+              <div style={{ fontSize: 11, color: 'rgba(229,57,53,0.9)', marginBottom: 6 }}>{recordingHint}</div>
+            ) : null}
+
+            <div style={styles.shortcutRow}>
+              <div style={styles.shortcutLabel}>实时预览</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={styles.shortcutValue}>{shortcutDraft.toggleLivePreview}</span>
+                <button
+                  style={styles.iconBtn}
+                  onClick={() => {
+                    setRecordingHint('');
+                    setRecordingAction('toggleLivePreview');
+                  }}
+                  title="设置"
+                  aria-label="设置实时预览快捷键"
+                >
+                  设
+                </button>
+              </div>
+            </div>
+
+            <div style={styles.shortcutRow}>
+              <div style={styles.shortcutLabel}>固定到桌面</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={styles.shortcutValue}>{shortcutDraft.togglePin}</span>
+                <button
+                  style={styles.iconBtn}
+                  onClick={() => {
+                    setRecordingHint('');
+                    setRecordingAction('togglePin');
+                  }}
+                  title="设置"
+                  aria-label="设置固定快捷键"
+                >
+                  设
+                </button>
+              </div>
+            </div>
+
+            <div style={styles.shortcutRow}>
+              <div style={styles.shortcutLabel}>移入垃圾桶</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={styles.shortcutValue}>{shortcutDraft.moveToTrash}</span>
+                <button
+                  style={styles.iconBtn}
+                  onClick={() => {
+                    setRecordingHint('');
+                    setRecordingAction('moveToTrash');
+                  }}
+                  title="设置"
+                  aria-label="设置删除快捷键"
+                >
+                  设
+                </button>
+              </div>
+            </div>
+
+            <div style={styles.modalActions}>
+              <button
+                style={styles.iconBtn}
+                onClick={() => {
+                  if (recordingAction) return;
+                  setShortcutDraft(getDefaultNoteShortcuts());
+                }}
+                title="恢复默认"
+                aria-label="恢复默认快捷键"
+              >
+                默认
+              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  style={styles.iconBtn}
+                  onClick={() => {
+                    if (recordingAction) return;
+                    setShortcutModalOpen(false);
+                  }}
+                  title="取消"
+                  aria-label="取消快捷键设置"
+                >
+                  取消
+                </button>
+                <button
+                  style={styles.iconBtn}
+                  onClick={() => {
+                    if (recordingAction) return;
+                    saveShortcutDraft();
+                  }}
+                  title="保存"
+                  aria-label="保存快捷键"
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
