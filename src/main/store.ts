@@ -21,12 +21,20 @@ export class StoreManager {
   }
 
   // ---- 便签 ----
-  getAllNotes(): StickyNote[] {
+  private getAllNotesRaw(): StickyNote[] {
     return this.store.get('notes', []);
   }
 
+  getAllNotes(): StickyNote[] {
+    return this.getAllNotesRaw().filter(note => !note.trashedAt);
+  }
+
+  getTrashedNotes(): StickyNote[] {
+    return this.getAllNotesRaw().filter(note => Boolean(note.trashedAt));
+  }
+
   createNote(): StickyNote {
-    const notes = this.getAllNotes();
+    const notes = this.getAllNotesRaw();
     const note: StickyNote = {
       id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       content: '',
@@ -36,6 +44,7 @@ export class StoreManager {
       width: 260,
       height: 280,
       pinned: false,
+      trashedAt: null,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -45,7 +54,7 @@ export class StoreManager {
   }
 
   updateNote(id: string, updates: Partial<StickyNote>): void {
-    const notes = this.getAllNotes();
+    const notes = this.getAllNotesRaw();
     const idx = notes.findIndex(n => n.id === id);
     if (idx !== -1) {
       notes[idx] = { ...notes[idx], ...updates, updatedAt: Date.now() };
@@ -53,9 +62,30 @@ export class StoreManager {
     }
   }
 
-  deleteNote(id: string): void {
-    const notes = this.getAllNotes().filter(n => n.id !== id);
+  trashNote(id: string): boolean {
+    const notes = this.getAllNotesRaw();
+    const idx = notes.findIndex(n => n.id === id);
+    if (idx === -1) return false;
+    notes[idx] = { ...notes[idx], trashedAt: Date.now(), updatedAt: Date.now() };
     this.store.set('notes', notes);
+    return true;
+  }
+
+  restoreNote(id: string): boolean {
+    const notes = this.getAllNotesRaw();
+    const idx = notes.findIndex(n => n.id === id);
+    if (idx === -1) return false;
+    notes[idx] = { ...notes[idx], trashedAt: null, updatedAt: Date.now() };
+    this.store.set('notes', notes);
+    return true;
+  }
+
+  purgeNote(id: string): boolean {
+    const notes = this.getAllNotesRaw();
+    const next = notes.filter(n => n.id !== id);
+    if (next.length === notes.length) return false;
+    this.store.set('notes', next);
+    return true;
   }
 
   // ---- 日历标记 ----

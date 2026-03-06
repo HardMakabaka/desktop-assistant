@@ -1,6 +1,6 @@
 {
   "name": "desktop-assistant",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "桌面助手 - 便签与日历桌面小工具",
   "author": "HardMakabaka",
   "main": "dist/main/main/main.js",
@@ -19,11 +19,13 @@
     "build:renderer": "vite build",
     "build": "npm run build:main && npm run build:renderer",
     "start": "npm run build && electron .",
-    "pack": "npm run build && electron-builder --win"
+    "pack": "npm run build && electron-builder --win",
+    "pack:linux": "npm run build && electron-builder --linux deb --publish never"
   },
   "dependencies": {
     "electron-store": "^8.1.0",
-    "electron-updater": "^6.8.3"
+    "electron-updater": "^6.8.3",
+    "tesseract.js": "^5.1.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.48",
@@ -63,6 +65,18 @@
       ],
       "executableName": "desktop-assistant",
       "icon": "resources/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "maintainer": "HardMakabaka"
     },
     "nsis": {
       "oneClick": false,

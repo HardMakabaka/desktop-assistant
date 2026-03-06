@@ -8,6 +8,7 @@ export interface StickyNote {
   width: number;
   height: number;
   pinned: boolean;
+  trashedAt?: number | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -24,12 +25,19 @@ export interface UpdateCheckResponse {
   message: string;
 }
 
+export type OcrResultPayload =
+  | { noteId: string; ok: true; text: string }
+  | { noteId: string; ok: false; message: string };
+
 /** IPC 频道 */
 export const IPC_CHANNELS = {
   // 便签
   NOTE_GET_ALL: 'note:get-all',
+  NOTE_GET_TRASHED: 'note:get-trashed',
   NOTE_SAVE: 'note:save',
   NOTE_DELETE: 'note:delete',
+  NOTE_RESTORE: 'note:restore',
+  NOTE_PURGE: 'note:purge',
   NOTE_CREATE: 'note:create',
   // 日历
   CALENDAR_GET_MARKS: 'calendar:get-marks',
@@ -41,4 +49,7 @@ export const IPC_CHANNELS = {
   WINDOW_OPEN_NOTE: 'window:open-note',
   WINDOW_OPEN_CALENDAR: 'window:open-calendar',
   UPDATE_CHECK: 'update:check',
+  OCR_OPEN_CAPTURE: 'ocr:open-capture',
+  OCR_SEND_RESULT: 'ocr:send-result',
+  OCR_RESULT: 'ocr:result',
 } as const;

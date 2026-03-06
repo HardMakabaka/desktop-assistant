@@ -1,10 +1,10 @@
 ---
 id: TASK-2
 title: Markdown 模式开关与实时预览
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-05 03:35'
-updated_date: '2026-03-05 03:35'
+updated_date: '2026-03-06 00:36'
 labels:
   - markdown
   - note

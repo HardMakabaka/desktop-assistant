@@ -4,16 +4,24 @@ import { existsSync } from 'fs';
 import { pathToFileURL } from 'url';
 import { autoUpdater } from 'electron-updater';
 import { StoreManager } from './store';
-import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse } from '../shared/types';
+import { IPC_CHANNELS, StickyNote, CalendarMark, UpdateCheckResponse, OcrResultPayload } from '../shared/types';
 
 const devServerURL = process.env.DESKTOP_ASSISTANT_DEV_URL || process.env.VITE_DEV_SERVER_URL;
 const isDev = Boolean(devServerURL);
 const store = new StoreManager();
 
+// Wayland screen capture in Chromium often depends on PipeWire.
+// Enabling this feature makes `getDisplayMedia` more likely to work on Ubuntu/Wayland.
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('enable-features', 'WebRTCPipeWireCapturer');
+}
+
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 const noteWindows = new Map<string, BrowserWindow>();
 let calendarWindow: BrowserWindow | null = null;
+let ocrWindow: BrowserWindow | null = null;
+let ocrSession: { noteId: string; reported: boolean } | null = null;
 let cachedPreloadPath: string | null = null;
 let updateDownloaded = false;
 
@@ -214,6 +222,63 @@ function createCalendarWindow(): void {
   });
 }
 
+function sendOcrResultToNote(payload: OcrResultPayload): boolean {
+  const win = noteWindows.get(payload.noteId);
+  if (!win || win.isDestroyed()) return false;
+  win.webContents.send(IPC_CHANNELS.OCR_RESULT, payload);
+  return true;
+}
+
+function createOcrWindow(noteId: string): void {
+  if (ocrWindow && !ocrWindow.isDestroyed()) {
+    ocrWindow.focus();
+    return;
+  }
+
+  ocrSession = { noteId, reported: false };
+
+  ocrWindow = new BrowserWindow({
+    fullscreen: true,
+    frame: false,
+    transparent: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    backgroundColor: '#000000',
+    webPreferences: {
+      preload: getPreloadPath(),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+    title: 'OCR 截图',
+  });
+
+  const ocrURL = new URL(getRendererURL('ocr'));
+  ocrURL.searchParams.set('noteId', noteId);
+  ocrWindow.loadURL(ocrURL.toString());
+  verifyBridge(ocrWindow, 'ocr-window');
+
+  ocrWindow.once('ready-to-show', () => {
+    if (!ocrWindow || ocrWindow.isDestroyed()) return;
+    ocrWindow.show();
+    ocrWindow.focus();
+  });
+
+  ocrWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
+    console.error('[ocr-window] load failed', { errorCode, errorDescription, validatedURL });
+  });
+
+  ocrWindow.on('closed', () => {
+    const session = ocrSession;
+    ocrWindow = null;
+    ocrSession = null;
+
+    if (session && !session.reported) {
+      sendOcrResultToNote({ noteId: session.noteId, ok: false, message: '已取消' });
+    }
+  });
+}
+
 function normalizeUpdaterError(error: unknown): string {
   if (error instanceof Error && error.message.trim()) {
     return error.message;
@@ -246,7 +311,14 @@ async function checkForUpdatesManually(): Promise<UpdateCheckResponse> {
 }
 
 function createTray(): void {
-  const icon = nativeImage.createEmpty();
+  const iconCandidates = [
+    path.join(process.cwd(), 'resources', 'icon.ico'),
+    path.join(process.resourcesPath, 'icon.ico'),
+  ];
+
+  const iconPath = iconCandidates.find(candidate => existsSync(candidate));
+  const loaded = iconPath ? nativeImage.createFromPath(iconPath) : null;
+  const icon = loaded && !loaded.isEmpty() ? loaded : nativeImage.createEmpty();
   tray = new Tray(icon);
   tray.setToolTip('桌面助手');
 
@@ -287,6 +359,10 @@ function setupIPC(): void {
     return store.getAllNotes();
   });
 
+  ipcMain.handle(IPC_CHANNELS.NOTE_GET_TRASHED, () => {
+    return store.getTrashedNotes();
+  });
+
   ipcMain.handle(IPC_CHANNELS.NOTE_CREATE, () => {
     return handleCreateNote();
   });
@@ -297,11 +373,23 @@ function setupIPC(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.NOTE_DELETE, (_event, id: string) => {
-    store.deleteNote(id);
+    const ok = store.trashNote(id);
     const win = noteWindows.get(id);
     if (win && !win.isDestroyed()) win.close();
     noteWindows.delete(id);
-    return true;
+    return ok;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.NOTE_RESTORE, (_event, id: string) => {
+    return store.restoreNote(id);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.NOTE_PURGE, (_event, id: string) => {
+    const ok = store.purgeNote(id);
+    const win = noteWindows.get(id);
+    if (win && !win.isDestroyed()) win.close();
+    noteWindows.delete(id);
+    return ok;
   });
 
   // 日历 IPC
@@ -349,6 +437,26 @@ function setupIPC(): void {
 
   ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, async () => {
     return checkForUpdatesManually();
+  });
+
+  ipcMain.handle(IPC_CHANNELS.OCR_OPEN_CAPTURE, (_event, noteId: string) => {
+    if (!noteId || typeof noteId !== 'string') return false;
+    createOcrWindow(noteId);
+    return true;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.OCR_SEND_RESULT, (_event, payload: OcrResultPayload) => {
+    if (!payload || typeof payload.noteId !== 'string') return false;
+
+    if (ocrSession && payload.noteId === ocrSession.noteId) {
+      ocrSession.reported = true;
+    }
+
+    const delivered = sendOcrResultToNote(payload);
+    if (ocrWindow && !ocrWindow.isDestroyed()) {
+      ocrWindow.close();
+    }
+    return delivered;
   });
 }
 
