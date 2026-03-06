@@ -23,4 +23,4 @@
 5. TASK-6  Linux Ubuntu 适配与打包验证
 
 ## Recent Runs
-- (pending)
+- 2026-03-06T00:36:05Z TASK-2 ok - add note markdown live preview toggle; verified via `npm run verify`
