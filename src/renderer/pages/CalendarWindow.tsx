@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import type { CalendarMark } from '../../shared/types';
+import { ColorOpacityPicker, hexToRgba } from './ColorOpacityPicker';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 const MARK_COLORS = ['#e53935', '#43a047', '#1e88e5', '#fb8c00', '#8e24aa', '#00acc1'];
@@ -176,6 +177,15 @@ export function CalendarWindow() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [markLabel, setMarkLabel] = useState('');
   const [markColor, setMarkColor] = useState(MARK_COLORS[0]);
+  const [calBgColor, setCalBgColor] = useState(() => {
+    try { return window.localStorage.getItem('desktop-assistant:calendar:bg-color') || '#ffffff'; }
+    catch { return '#ffffff'; }
+  });
+  const [calBgOpacity, setCalBgOpacity] = useState(() => {
+    try { return Number(window.localStorage.getItem('desktop-assistant:calendar:bg-opacity')) || 100; }
+    catch { return 100; }
+  });
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
   const loadMarks = useCallback(async () => {
     const data = await window.desktopAPI.getMarks();
@@ -203,6 +213,16 @@ export function CalendarWindow() {
   };
 
   const handleClose = () => window.desktopAPI.closeWindow();
+
+  const handleCalColorChange = useCallback((c: string) => {
+    setCalBgColor(c);
+    try { window.localStorage.setItem('desktop-assistant:calendar:bg-color', c); } catch { /* */ }
+  }, []);
+
+  const handleCalOpacityChange = useCallback((o: number) => {
+    setCalBgOpacity(o);
+    try { window.localStorage.setItem('desktop-assistant:calendar:bg-opacity', String(o)); } catch { /* */ }
+  }, []);
 
   const handleDayClick = (day: number) => {
     const date = formatDate(year, month, day);
@@ -239,7 +259,7 @@ export function CalendarWindow() {
   for (let d = 1; d <= daysInMonth; d++) days.push(d);
 
   return (
-    <div style={styles.container}>
+    <div style={{ ...styles.container, background: hexToRgba(calBgColor, calBgOpacity) }}>
       <div style={styles.header}>
         <div style={styles.headerActions}>
           <button
@@ -263,6 +283,16 @@ export function CalendarWindow() {
           </button>
         </div>
         <div style={styles.headerActions}>
+          <button
+            style={styles.iconBtn}
+            onClick={() => setColorPickerOpen(v => !v)}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            title="背景颜色与透明度"
+            aria-label="背景颜色与透明度"
+          >
+            🎨
+          </button>
           <button
             style={{ ...styles.iconBtn, color: pinned ? '#ffeb3b' : '#fff' }}
             onClick={handlePin}
@@ -332,6 +362,16 @@ export function CalendarWindow() {
           );
         })}
       </div>
+
+      {colorPickerOpen ? (
+        <ColorOpacityPicker
+          color={calBgColor}
+          opacity={calBgOpacity}
+          onColorChange={handleCalColorChange}
+          onOpacityChange={handleCalOpacityChange}
+          onClose={() => setColorPickerOpen(false)}
+        />
+      ) : null}
 
       {/* 标记编辑弹窗 */}
       {selectedDate && (

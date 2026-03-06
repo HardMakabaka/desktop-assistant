@@ -1,7 +1,7 @@
 ---
 id: TASK-12
 title: 补充 Mermaid 架构图
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-06 18:56'
 updated_date: '2026-03-06 18:56'

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import type { StickyNote } from '../../shared/types';
+import { ColorOpacityPicker, hexToRgba } from './ColorOpacityPicker';
 
 function escapeHtml(input: string): string {
   return input
@@ -407,6 +408,7 @@ export function NoteWindow() {
   const [shortcutDraft, setShortcutDraft] = useState<NoteShortcutConfig>(() => getDefaultNoteShortcuts());
   const [recordingAction, setRecordingAction] = useState<NoteShortcutAction | null>(null);
   const [recordingHint, setRecordingHint] = useState('');
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -603,6 +605,20 @@ export function NoteWindow() {
     window.desktopAPI.closeWindow();
   };
 
+  const handleColorChange = useCallback((newColor: string) => {
+    if (!note) return;
+    const updated = { ...note, color: newColor };
+    setNote(updated);
+    window.desktopAPI.saveNote({ id: note.id, color: newColor });
+  }, [note]);
+
+  const handleOpacityChange = useCallback((newOpacity: number) => {
+    if (!note) return;
+    const updated = { ...note, opacity: newOpacity };
+    setNote(updated);
+    window.desktopAPI.saveNote({ id: note.id, opacity: newOpacity });
+  }, [note]);
+
   const openShortcutModal = () => {
     setShortcutDraft(shortcuts);
     setRecordingAction(null);
@@ -679,11 +695,13 @@ export function NoteWindow() {
     return `rgb(${r},${g},${b})`;
   };
 
+  const noteOpacity = note.opacity ?? 100;
+  const bgRgba = hexToRgba(note.color, noteOpacity);
   const headerBg = darkenColor(note.color, 15);
   const previewHtml = livePreviewEnabled ? renderMarkdownToSafeHtml(note.content) : '';
 
   return (
-    <div style={{ ...styles.container, background: note.color }}>
+    <div style={{ ...styles.container, background: bgRgba }}>
       <div style={{ ...styles.header, background: headerBg }}>
         <div style={styles.headerActions}>
           <button
@@ -737,6 +755,17 @@ export function NoteWindow() {
           >
             OCR
           </button>
+
+          <button
+            style={styles.iconBtn}
+            onClick={() => setColorPickerOpen(v => !v)}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            title="背景颜色与透明度"
+            aria-label="背景颜色与透明度"
+          >
+            🎨
+          </button>
         </div>
         <div style={styles.headerActions}>
           <button
@@ -777,6 +806,16 @@ export function NoteWindow() {
         <span>{actionHint}</span>
         <span>{new Date(note.updatedAt).toLocaleString('zh-CN')}</span>
       </div>
+
+      {colorPickerOpen && note ? (
+        <ColorOpacityPicker
+          color={note.color}
+          opacity={note.opacity ?? 100}
+          onColorChange={handleColorChange}
+          onOpacityChange={handleOpacityChange}
+          onClose={() => setColorPickerOpen(false)}
+        />
+      ) : null}
 
       {shortcutModalOpen ? (
         <div

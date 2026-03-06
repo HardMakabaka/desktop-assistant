@@ -39,6 +39,7 @@ export class StoreManager {
       id: `note_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       content: '',
       color: NOTE_COLORS[notes.length % NOTE_COLORS.length],
+      opacity: 100,
       x: 100 + (notes.length % 5) * 30,
       y: 100 + (notes.length % 5) * 30,
       width: 260,
