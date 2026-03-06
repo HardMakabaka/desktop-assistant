@@ -287,6 +287,10 @@ function setupIPC(): void {
     return store.getAllNotes();
   });
 
+  ipcMain.handle(IPC_CHANNELS.NOTE_GET_TRASHED, () => {
+    return store.getTrashedNotes();
+  });
+
   ipcMain.handle(IPC_CHANNELS.NOTE_CREATE, () => {
     return handleCreateNote();
   });
@@ -297,11 +301,23 @@ function setupIPC(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.NOTE_DELETE, (_event, id: string) => {
-    store.deleteNote(id);
+    const ok = store.trashNote(id);
     const win = noteWindows.get(id);
     if (win && !win.isDestroyed()) win.close();
     noteWindows.delete(id);
-    return true;
+    return ok;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.NOTE_RESTORE, (_event, id: string) => {
+    return store.restoreNote(id);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.NOTE_PURGE, (_event, id: string) => {
+    const ok = store.purgeNote(id);
+    const win = noteWindows.get(id);
+    if (win && !win.isDestroyed()) win.close();
+    noteWindows.delete(id);
+    return ok;
   });
 
   // 日历 IPC

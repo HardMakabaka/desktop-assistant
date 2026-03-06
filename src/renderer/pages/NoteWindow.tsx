@@ -154,6 +154,8 @@ const styles = {
 export function NoteWindow() {
   const [note, setNote] = useState<StickyNote | null>(null);
   const [pinned, setPinned] = useState(false);
+  const [actionHint, setActionHint] = useState('');
+  const [actionBusy, setActionBusy] = useState(false);
   const [livePreviewEnabled, setLivePreviewEnabled] = useState(() => {
     try {
       return window.localStorage.getItem('desktop-assistant:note:live-preview') === '1';
@@ -217,7 +219,30 @@ export function NoteWindow() {
 
   const handleDelete = async () => {
     if (!note) return;
-    await window.desktopAPI.deleteNote(note.id);
+    if (actionBusy) return;
+    const confirmed = window.confirm('将便签移入垃圾桶？可在主面板垃圾桶中恢复。');
+    if (!confirmed) return;
+
+    setActionBusy(true);
+    setActionHint('正在移入垃圾桶...');
+
+    try {
+      const ok = await window.desktopAPI.deleteNote(note.id);
+      if (!ok) {
+        setActionBusy(false);
+        setActionHint('移入垃圾桶失败');
+        return;
+      }
+
+      setActionHint('已移入垃圾桶，可在主面板垃圾桶中恢复');
+      setTimeout(() => {
+        void window.desktopAPI.closeWindow();
+      }, 650);
+    } catch (error) {
+      setActionBusy(false);
+      const detail = error instanceof Error ? error.message : '移入垃圾桶失败';
+      setActionHint(detail || '移入垃圾桶失败');
+    }
   };
 
   const handleClose = () => {
@@ -274,6 +299,7 @@ export function NoteWindow() {
           <button
             style={styles.iconBtn}
             onClick={handleDelete}
+            disabled={actionBusy}
             onMouseEnter={e => {
               e.currentTarget.style.background = 'rgba(229,57,53,0.15)';
               e.currentTarget.style.color = '#e53935';
@@ -282,8 +308,8 @@ export function NoteWindow() {
               e.currentTarget.style.background = 'transparent';
               e.currentTarget.style.color = 'rgba(0,0,0,0.5)';
             }}
-            title="删除便签"
-            aria-label="删除便签"
+            title="移入垃圾桶"
+            aria-label="移入垃圾桶"
           >
             🗑
           </button>
@@ -308,6 +334,7 @@ export function NoteWindow() {
           onChange={e => handleContentChange(e.target.value)}
           placeholder="在这里写点什么..."
           aria-label="便签内容"
+          disabled={actionBusy}
         />
 
         {livePreviewEnabled ? (
@@ -319,8 +346,9 @@ export function NoteWindow() {
         ) : null}
       </div>
 
-      <div style={styles.footer}>
-        {new Date(note.updatedAt).toLocaleString('zh-CN')}
+      <div style={{ ...styles.footer, display: 'flex', justifyContent: 'space-between' }}>
+        <span>{actionHint}</span>
+        <span>{new Date(note.updatedAt).toLocaleString('zh-CN')}</span>
       </div>
     </div>
   );

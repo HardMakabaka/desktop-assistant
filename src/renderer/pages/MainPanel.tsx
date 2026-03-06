@@ -191,6 +191,7 @@ const styles = {
 
 export function MainPanel() {
   const [notes, setNotes] = useState<StickyNote[]>([]);
+  const [trashedNotes, setTrashedNotes] = useState<StickyNote[]>([]);
   const [actionError, setActionError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
@@ -204,15 +205,17 @@ export function MainPanel() {
     return api;
   };
 
-  const runAction = async (action: () => Promise<unknown>, fallbackMessage: string): Promise<void> => {
+  const runAction = async (action: () => Promise<unknown>, fallbackMessage: string): Promise<boolean> => {
     try {
       setActionError('');
       setActionSuccess('');
       await action();
+      return true;
     } catch (error) {
       const detail = error instanceof Error ? error.message : fallbackMessage;
       setActionSuccess('');
       setActionError(detail || fallbackMessage);
+      return false;
     }
   };
 
@@ -223,8 +226,16 @@ export function MainPanel() {
     }, '加载便签失败');
   };
 
+  const loadTrashedNotes = async () => {
+    await runAction(async () => {
+      const data = await getDesktopAPI().getTrashedNotes();
+      setTrashedNotes(data);
+    }, '加载垃圾桶失败');
+  };
+
   useEffect(() => {
-    loadNotes();
+    void loadNotes();
+    void loadTrashedNotes();
   }, []);
 
   useEffect(() => {
@@ -263,10 +274,44 @@ export function MainPanel() {
 
   const handleDeleteNote = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    await runAction(async () => {
+    const ok = await runAction(async () => {
       await getDesktopAPI().deleteNote(id);
       await loadNotes();
+      await loadTrashedNotes();
     }, '删除便签失败');
+
+    if (ok) {
+      setActionSuccess('已移入垃圾桶');
+    }
+  };
+
+  const handleRestoreNote = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const ok = await runAction(async () => {
+      await getDesktopAPI().restoreNote(id);
+      await loadNotes();
+      await loadTrashedNotes();
+    }, '恢复便签失败');
+
+    if (ok) {
+      setActionSuccess('已从垃圾桶恢复');
+    }
+  };
+
+  const handlePurgeNote = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const confirmed = window.confirm('彻底删除后无法恢复，是否继续？');
+    if (!confirmed) return;
+
+    const ok = await runAction(async () => {
+      await getDesktopAPI().purgeNote(id);
+      await loadNotes();
+      await loadTrashedNotes();
+    }, '彻底删除失败');
+
+    if (ok) {
+      setActionSuccess('已彻底删除，无法恢复');
+    }
   };
 
   const handleClose = async () => {
@@ -420,6 +465,47 @@ export function MainPanel() {
                     aria-label={`删除便签: ${note.content.slice(0, 20) || '空便签'}`}
                   >
                     ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={styles.section}>
+          <div style={styles.sectionTitle}>垃圾桶 ({trashedNotes.length})</div>
+          {trashedNotes.length === 0 ? (
+            <div style={styles.empty}>垃圾桶为空</div>
+          ) : (
+            <div style={styles.noteList}>
+              {trashedNotes.map(note => (
+                <div
+                  key={note.id}
+                  style={{ ...styles.noteItem, opacity: 0.9 }}
+                  role="group"
+                  aria-label={`垃圾桶便签: ${note.content.slice(0, 20) || '空便签'}`}
+                >
+                  <span style={{ ...styles.noteColor, background: note.color }} />
+                  <span style={styles.noteText}>{note.content || '空便签'}</span>
+                  <button
+                    style={styles.noteDelete}
+                    onClick={e => handleRestoreNote(e, note.id)}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#a5d6a7')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
+                    aria-label={`恢复便签: ${note.content.slice(0, 20) || '空便签'}`}
+                    title="恢复"
+                  >
+                    ↩
+                  </button>
+                  <button
+                    style={styles.noteDelete}
+                    onClick={e => handlePurgeNote(e, note.id)}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#ff6b6b')}
+                    onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.5)')}
+                    aria-label={`彻底删除便签: ${note.content.slice(0, 20) || '空便签'}`}
+                    title="彻底删除"
+                  >
+                    🗑
                   </button>
                 </div>
               ))}

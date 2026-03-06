@@ -1,10 +1,10 @@
 ---
 id: TASK-5
 title: 删除流程重构（垃圾桶缓冲与彻底删除分离）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-05 03:37'
-updated_date: '2026-03-05 03:37'
+updated_date: '2026-03-06 02:48'
 labels:
   - delete
   - trash
