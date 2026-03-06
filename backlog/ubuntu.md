@@ -51,6 +51,13 @@ Install the generated `.deb`:
 sudo dpkg -i release/*.deb
 ```
 
+## Feature Notes (What Changed)
+
+- Notes support a Markdown live preview toggle (preview vs source mode).
+- OCR text extraction is available via the capture flow; first use may download language data.
+- In-note shortcuts support Tab indent/outdent plus configurable shortcuts.
+- Deleting a note moves it to Trash; permanent deletion happens from Trash.
+
 ## OCR + Screenshot Notes
 
 - Screen capture uses `getDisplayMedia`. On Wayland, it typically goes through PipeWire + xdg-desktop-portal.

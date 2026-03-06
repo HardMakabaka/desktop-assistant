@@ -1,10 +1,10 @@
 ---
 id: TASK-1
 title: EPIC 便签核心能力升级（Markdown/OCR/快捷键/回收站/Ubuntu）
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-05 03:35'
-updated_date: '2026-03-05 03:35'
+updated_date: '2026-03-06 12:24'
 labels:
   - epic
   - note
