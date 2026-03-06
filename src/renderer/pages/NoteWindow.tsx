@@ -1,4 +1,14 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import {
+  MDXEditor,
+  type MDXEditorMethods,
+  diffSourcePlugin,
+  headingsPlugin,
+  listsPlugin,
+  quotePlugin,
+  thematicBreakPlugin,
+  markdownShortcutPlugin,
+} from '@mdxeditor/editor';
 import type { StickyNote } from '../../shared/types';
 import { ColorOpacityPicker, hexToRgba } from './ColorOpacityPicker';
 
@@ -92,6 +102,32 @@ type NoteShortcutConfig = Record<NoteShortcutAction, string>;
 
 const NOTE_SHORTCUTS_STORAGE_KEY = 'desktop-assistant:note:shortcuts-v1';
 const NOTE_INDENT = '  ';
+
+const NOTE_FONT_SIZE_STORAGE_KEY = 'desktop-assistant:note:font-size-v1';
+const NOTE_FONT_SIZE_MIN = 12;
+const NOTE_FONT_SIZE_MAX = 24;
+const NOTE_FONT_SIZE_DEFAULT = 14;
+
+function clampFontSize(value: number): number {
+  if (!Number.isFinite(value)) return NOTE_FONT_SIZE_DEFAULT;
+  return Math.max(NOTE_FONT_SIZE_MIN, Math.min(NOTE_FONT_SIZE_MAX, Math.round(value)));
+}
+
+function loadFontSizeFromStorage(): number {
+  try {
+    const raw = window.localStorage.getItem(NOTE_FONT_SIZE_STORAGE_KEY);
+    if (!raw) return NOTE_FONT_SIZE_DEFAULT;
+    const parsed = Number(raw);
+    return clampFontSize(parsed);
+  } catch (error) {
+    console.warn('[note-window] failed to read font size preference', error);
+    return NOTE_FONT_SIZE_DEFAULT;
+  }
+}
+
+function persistFontSizeToStorage(value: number): void {
+  window.localStorage.setItem(NOTE_FONT_SIZE_STORAGE_KEY, String(clampFontSize(value)));
+}
 
 function getDefaultNoteShortcuts(): NoteShortcutConfig {
   return {
@@ -396,6 +432,7 @@ export function NoteWindow() {
       return false;
     }
   });
+  const [noteFontSize, setNoteFontSize] = useState(() => loadFontSizeFromStorage());
   const [shortcuts, setShortcuts] = useState<NoteShortcutConfig>(() => {
     try {
       return loadShortcutConfigFromStorage();
@@ -409,7 +446,7 @@ export function NoteWindow() {
   const [recordingAction, setRecordingAction] = useState<NoteShortcutAction | null>(null);
   const [recordingHint, setRecordingHint] = useState('');
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mdxEditorRef = useRef<MDXEditorMethods>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   // 从 URL 获取便签 ID
@@ -442,10 +479,20 @@ export function NoteWindow() {
   }, [livePreviewEnabled]);
 
   useEffect(() => {
-    if (note && textareaRef.current) {
-      textareaRef.current.focus();
+    try {
+      persistFontSizeToStorage(noteFontSize);
+    } catch (error) {
+      console.warn('[note-window] failed to persist font size preference', error);
     }
-  }, [note]);
+  }, [noteFontSize]);
+
+  useEffect(() => {
+    if (!note) return;
+
+    requestAnimationFrame(() => {
+      mdxEditorRef.current?.setMarkdown(note.content || '');
+    });
+  }, [note?.id]);
 
   useEffect(() => {
     if (!recordingAction) return;
@@ -491,6 +538,7 @@ export function NoteWindow() {
   const handleContentChange = useCallback((content: string) => {
     const current = noteRef.current;
     if (!current) return;
+    if (content === current.content) return;
     setNote(prev => (prev ? { ...prev, content } : prev));
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -502,27 +550,19 @@ export function NoteWindow() {
   const insertTextAtCursor = useCallback(
     (text: string) => {
       const current = noteRef.current;
-      const textarea = textareaRef.current;
-      if (!current || !textarea) return;
+      if (!current) return;
 
-      const value = current.content;
-      const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : value.length;
-      const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : value.length;
-      const prefix = value.slice(0, start);
-      const suffix = value.slice(end);
-
-      const needsLeadingNewline = prefix.length > 0 && !prefix.endsWith('\n');
+      const editor = mdxEditorRef.current;
+      const md = editor?.getMarkdown?.() ?? current.content ?? '';
+      const needsLeadingNewline = md.length > 0 && !md.endsWith('\n');
       const insertion = `${needsLeadingNewline ? '\n' : ''}${text}\n`;
-      const nextValue = prefix + insertion + suffix;
-      handleContentChange(nextValue);
 
-      requestAnimationFrame(() => {
-        if (!textareaRef.current) return;
-        const nextPos = start + insertion.length;
-        textareaRef.current.focus();
-        textareaRef.current.selectionStart = nextPos;
-        textareaRef.current.selectionEnd = nextPos;
-      });
+      if (editor && typeof editor.insertMarkdown === 'function') {
+        editor.insertMarkdown(insertion);
+        return;
+      }
+
+      handleContentChange(md + insertion);
     },
     [handleContentChange],
   );
@@ -643,6 +683,10 @@ export function NoteWindow() {
     }
   };
 
+  const toggleEditorMode = useCallback(() => {
+    setLivePreviewEnabled(v => !v);
+  }, []);
+
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!note) return;
 
@@ -655,9 +699,8 @@ export function NoteWindow() {
         : applyIndentFormatting(value, selectionStart, selectionEnd, NOTE_INDENT);
       handleContentChange(next.value);
       requestAnimationFrame(() => {
-        if (!textareaRef.current) return;
-        textareaRef.current.selectionStart = next.selectionStart;
-        textareaRef.current.selectionEnd = next.selectionEnd;
+        textarea.selectionStart = next.selectionStart;
+        textarea.selectionEnd = next.selectionEnd;
       });
       return;
     }
@@ -673,7 +716,7 @@ export function NoteWindow() {
 
     e.preventDefault();
     if (action === 'toggleLivePreview') {
-      setLivePreviewEnabled(v => !v);
+      toggleEditorMode();
       return;
     }
     if (action === 'togglePin') {
@@ -684,6 +727,38 @@ export function NoteWindow() {
       void handleDelete();
     }
   };
+
+  useEffect(() => {
+    if (recordingAction) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (isReservedSystemShortcut(e)) return;
+
+      const shortcut = shortcutFromKeyboardEvent(e);
+      if (!shortcut) return;
+
+      const action = (Object.keys(shortcuts) as NoteShortcutAction[]).find(a => shortcuts[a] === shortcut);
+      if (!action) return;
+
+      e.preventDefault();
+
+      if (action === 'toggleLivePreview') {
+        toggleEditorMode();
+        return;
+      }
+      if (action === 'togglePin') {
+        void handlePin();
+        return;
+      }
+      if (action === 'moveToTrash') {
+        void handleDelete();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [handleDelete, handlePin, recordingAction, shortcuts, toggleEditorMode]);
 
   if (!note) return null;
 
@@ -698,7 +773,6 @@ export function NoteWindow() {
   const noteOpacity = note.opacity ?? 100;
   const bgRgba = hexToRgba(note.color, noteOpacity);
   const headerBg = darkenColor(note.color, 15);
-  const previewHtml = livePreviewEnabled ? renderMarkdownToSafeHtml(note.content) : '';
 
   return (
     <div style={{ ...styles.container, background: bgRgba }}>
@@ -724,13 +798,45 @@ export function NoteWindow() {
               fontSize: '11px',
               color: livePreviewEnabled ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.5)',
             }}
-            onClick={() => setLivePreviewEnabled(v => !v)}
+            onClick={toggleEditorMode}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            title={livePreviewEnabled ? '切换到源码模式' : '开启实时预览'}
-            aria-label={livePreviewEnabled ? '切换到源码模式' : '开启实时预览'}
+            title={livePreviewEnabled ? '切换到源码模式' : '切换到所见即所得'}
+            aria-label={livePreviewEnabled ? '切换到源码模式' : '切换到所见即所得'}
           >
-            {livePreviewEnabled ? '源码' : '预览'}
+            {livePreviewEnabled ? '源码' : '所见'}
+          </button>
+
+          <button
+            style={{
+              ...styles.iconBtn,
+              fontSize: '11px',
+              opacity: noteFontSize <= NOTE_FONT_SIZE_MIN ? 0.35 : 1,
+            }}
+            onClick={() => setNoteFontSize(v => clampFontSize(v - 1))}
+            disabled={noteFontSize <= NOTE_FONT_SIZE_MIN}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            title={`减小字号（当前 ${noteFontSize}px）`}
+            aria-label="减小字号"
+          >
+            A-
+          </button>
+
+          <button
+            style={{
+              ...styles.iconBtn,
+              fontSize: '11px',
+              opacity: noteFontSize >= NOTE_FONT_SIZE_MAX ? 0.35 : 1,
+            }}
+            onClick={() => setNoteFontSize(v => clampFontSize(v + 1))}
+            disabled={noteFontSize >= NOTE_FONT_SIZE_MAX}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            title={`增大字号（当前 ${noteFontSize}px）`}
+            aria-label="增大字号"
+          >
+            A+
           </button>
 
           <button
@@ -782,24 +888,39 @@ export function NoteWindow() {
       </div>
 
       <div style={styles.body}>
-        <textarea
-          ref={textareaRef}
-          style={styles.textarea}
-          value={note.content}
-          onChange={e => handleContentChange(e.target.value)}
-          onKeyDown={handleTextareaKeyDown}
-          placeholder="在这里写点什么..."
-          aria-label="便签内容"
-          disabled={actionBusy}
-        />
+        <div style={{ flex: 1, minHeight: 0 }} className="note-mdx">
+          <style>{`
+            .note-mdx {
+              user-select: text;
+            }
+            .note-mdx .note-mdx-prose {
+              font-size: ${noteFontSize}px;
+              line-height: 1.6;
+              color: rgba(0,0,0,0.82);
+              padding: 8px 14px 14px;
+              min-height: 100%;
+              outline: none;
+            }
+          `}</style>
 
-        {livePreviewEnabled ? (
-          <div
-            style={styles.preview}
-            aria-label="实时预览"
-            dangerouslySetInnerHTML={{ __html: previewHtml }}
+          <MDXEditor
+            key={livePreviewEnabled ? 'rich-text' : 'source'}
+            ref={mdxEditorRef}
+            markdown={note.content}
+            onChange={(md: string) => handleContentChange(md)}
+            className="note-mdx-editor"
+            contentEditableClassName="note-mdx-prose"
+            readOnly={actionBusy}
+            plugins={[
+              headingsPlugin(),
+              listsPlugin(),
+              quotePlugin(),
+              thematicBreakPlugin(),
+              markdownShortcutPlugin(),
+              diffSourcePlugin({ viewMode: livePreviewEnabled ? 'rich-text' : 'source' }),
+            ]}
           />
-        ) : null}
+        </div>
       </div>
 
       <div style={{ ...styles.footer, display: 'flex', justifyContent: 'space-between' }}>
@@ -844,7 +965,7 @@ export function NoteWindow() {
             ) : null}
 
             <div style={styles.shortcutRow}>
-              <div style={styles.shortcutLabel}>实时预览</div>
+              <div style={styles.shortcutLabel}>编辑模式</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={styles.shortcutValue}>{shortcutDraft.toggleLivePreview}</span>
                 <button
@@ -854,7 +975,7 @@ export function NoteWindow() {
                     setRecordingAction('toggleLivePreview');
                   }}
                   title="设置"
-                  aria-label="设置实时预览快捷键"
+                  aria-label="设置编辑模式快捷键"
                 >
                   设
                 </button>

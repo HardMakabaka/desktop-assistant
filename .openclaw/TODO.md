@@ -30,3 +30,4 @@
 - 2026-03-06T10:37:17Z TASK-6 ok - add Linux deb packaging + Ubuntu notes; verified via `npm run verify` and `npm run pack:linux`
 - 2026-03-06T12:24:28Z TASK-1 ok - close epic + document feature changes for Ubuntu; verified via `npm run verify`
 - 2026-03-06T20:24:46Z TASK-8 ok - improve OCR download prompt, progress, friendly errors, retry; verified via `npm run verify`
+- 2026-03-06T22:39:36Z TASK-9 ok - WYSIWYG editor + source toggle + font size persistence; verified via `npm run verify`

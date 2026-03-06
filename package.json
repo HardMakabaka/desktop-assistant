@@ -23,6 +23,7 @@
     "pack:linux": "npm run build && electron-builder --linux deb --publish never"
   },
   "dependencies": {
+    "@mdxeditor/editor": "^3.0.0",
     "electron-store": "^8.1.0",
     "electron-updater": "^6.8.3",
     "tesseract.js": "^5.1.1"

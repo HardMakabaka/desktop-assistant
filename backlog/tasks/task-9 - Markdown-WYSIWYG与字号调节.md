@@ -1,10 +1,10 @@
 ---
 id: TASK-9
 title: Markdown 所见即所得（WYSIWYG）+ 整体字号调节
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-06 18:56'
-updated_date: '2026-03-06 18:56'
+updated_date: '2026-03-06 22:39'
 labels:
   - markdown
   - editor
