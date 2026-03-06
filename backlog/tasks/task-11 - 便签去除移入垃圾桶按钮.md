@@ -1,7 +1,7 @@
 ---
 id: TASK-11
 title: 便签界面去除"移入垃圾桶"按钮
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-03-06 18:56'
 updated_date: '2026-03-06 18:56'

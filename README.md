@@ -103,44 +103,103 @@ OCR 流程为：
 
 ## 架构总览
 
-```text
-+---------------------------+
-| Electron Main Process     |
-| src/main/main.ts          |
-| - 创建主窗口/便签窗口     |
-| - 创建日历窗口/OCR窗口    |
-| - 注册 IPC                |
-| - 调用 StoreManager       |
-| - 处理自动更新            |
-+-------------+-------------+
-              |
-              | contextBridge + ipcRenderer
-              v
-+---------------------------+
-| Preload Bridge            |
-| src/main/preload.ts       |
-| - 暴露 window.desktopAPI  |
-| - 限制渲染层能力边界      |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| Renderer (React)          |
-| src/renderer/pages/*      |
-| - MainPanel               |
-| - NoteWindow              |
-| - CalendarWindow          |
-| - OcrCaptureWindow        |
-+-------------+-------------+
-              |
-              v
-+---------------------------+
-| Local Persistence         |
-| src/main/store.ts         |
-| - notes                   |
-| - marks                   |
-| - trash state             |
-+---------------------------+
+```mermaid
+graph TB
+    subgraph Main["🖥️ Electron Main Process<br/><code>src/main/main.ts</code>"]
+        IPC["IPC Handler<br/>窗口管理 · OCR 调度 · 更新检查"]
+        Store["StoreManager<br/><code>src/main/store.ts</code><br/>notes · marks · trash"]
+        Updater["electron-updater<br/>自动更新"]
+        Tray["System Tray<br/>托盘菜单"]
+    end
+
+    subgraph Preload["🔒 Preload Bridge<br/><code>src/main/preload.ts</code>"]
+        API["window.desktopAPI<br/>contextBridge 安全暴露"]
+    end
+
+    subgraph Renderer["⚛️ Renderer (React + Vite)"]
+        MP["📋 MainPanel<br/>便签列表 · 垃圾桶 · 入口"]
+        NW["📝 NoteWindow<br/>编辑器 · Markdown · 快捷键"]
+        CW["📅 CalendarWindow<br/>日期标记 · 事件管理"]
+        OCR["🔍 OcrCaptureWindow<br/>截图框选 · 文字识别"]
+    end
+
+    subgraph External["☁️ 外部依赖"]
+        Tesseract["tesseract.js<br/>OCR 引擎 + CDN 语言包"]
+        GH["GitHub Releases<br/>安装包 · 更新元数据"]
+    end
+
+    subgraph Persistence["💾 本地持久化"]
+        ES["electron-store<br/>JSON 文件"]
+        LS["localStorage<br/>前端偏好"]
+    end
+
+    %% 连接
+    IPC <-->|ipcMain / ipcRenderer| API
+    API <-->|window.desktopAPI| MP
+    API <-->|window.desktopAPI| NW
+    API <-->|window.desktopAPI| CW
+    API <-->|window.desktopAPI| OCR
+
+    IPC --> Store
+    Store --> ES
+    NW --> LS
+    CW --> LS
+
+    IPC --> Updater
+    Updater -->|检查 & 下载| GH
+    OCR -->|识别| Tesseract
+    Tesseract -->|下载语言包| GH
+
+    Tray -->|打开窗口| IPC
+
+    %% 窗口间通信
+    OCR -.->|OCR 结果 via IPC| NW
+    MP -.->|打开便签/日历| IPC
+
+    classDef mainStyle fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef preloadStyle fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef rendererStyle fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+    classDef externalStyle fill:#fce4ec,stroke:#c62828,stroke-width:1px
+    classDef persistStyle fill:#f3e5f5,stroke:#6a1b9a,stroke-width:1px
+
+    class Main mainStyle
+    class Preload preloadStyle
+    class Renderer rendererStyle
+    class External externalStyle
+    class Persistence persistStyle
+```
+
+### 数据流概览
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant NW as NoteWindow
+    participant API as desktopAPI
+    participant M as Main Process
+    participant S as StoreManager
+    participant OCR as OcrWindow
+    participant T as tesseract.js
+
+    Note over U,T: 📝 新建 & 编辑便签
+    U->>NW: 编辑内容
+    NW->>API: saveNote(data)
+    API->>M: IPC note:save
+    M->>S: updateNote()
+    S-->>M: ✅
+
+    Note over U,T: 🔍 OCR 截图识别
+    U->>NW: 点击 OCR
+    NW->>API: openOcrCapture(noteId)
+    API->>M: IPC ocr:open-capture
+    M->>OCR: createOcrWindow()
+    U->>OCR: 框选识别区域
+    OCR->>T: recognize(image)
+    T-->>OCR: 识别文字
+    OCR->>API: sendOcrResult()
+    API->>M: IPC ocr:send-result
+    M->>NW: IPC ocr:result
+    NW->>NW: 插入识别文字
 ```
 
 ## 分层说明
