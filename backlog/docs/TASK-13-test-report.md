@@ -5,17 +5,23 @@
 - Task: TASK-13
 - Repo: desktop-assistant
 - Report status: In progress
-- Updated (UTC): 2026-03-07T04:28:39Z
-- Commit: 23026dd
+- Updated (UTC): 2026-03-07T22:30:09Z
+- Commit: 1480819
 - Environment: Linux (Ubuntu) x64
+
+## Evidence
+
+- Local: `npm run verify` passed on Linux (Ubuntu)
+- CI: https://github.com/HardMakabaka/desktop-assistant/actions/runs/22806546617 (success)
+  - Jobs: `verify (ubuntu-latest)`, `verify (windows-latest)`
 
 ## A. Build Verification
 
 - [x] `npm run typecheck` (0 errors) (Linux)
 - [x] `npm run build` (Linux)
-- [ ] `npm run pack` (Windows) -> `.exe` produced
+- [x] `npm run pack` (Windows) -> `.exe` produced (validated in CI)
 - [x] `npm run pack:linux` (Linux) -> `.deb` produced (`release/桌面助手-1.0.4-linux-amd64.deb`)
-- [ ] GitHub Actions CI green on `ubuntu-latest` and `windows-latest`
+- [x] GitHub Actions CI green on `ubuntu-latest` and `windows-latest`
 
 ## B. Notes Core
 
