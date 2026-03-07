@@ -30,3 +30,4 @@
 - 2026-03-06T20:24:46Z TASK-8 ok - improve OCR download prompt, progress, friendly errors, retry; verified via `npm run verify`
 - 2026-03-06T22:39:36Z TASK-9 ok - WYSIWYG editor + source toggle + font size persistence; verified via `npm run verify`
 - 2026-03-07T00:30:40Z TASK-13 error - add windows coverage to CI + start test report; verified via `npm run verify` and `npm run pack:linux`
+- 2026-03-07T04:28:39Z TASK-13 ok - update Linux build verification + refresh test report; verified via `npm run verify` and `npm run pack:linux`

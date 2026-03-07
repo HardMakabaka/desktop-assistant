@@ -1,10 +1,10 @@
 ---
 id: TASK-13
 title: Linux + Windows 跨平台全面测试
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-03-06 18:56'
-updated_date: '2026-03-06 18:56'
+updated_date: '2026-03-07 04:28'
 labels:
   - testing
   - linux
