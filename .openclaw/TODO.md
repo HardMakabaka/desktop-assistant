@@ -16,11 +16,9 @@
 - working_branch: ulw/desktop-assistant-auto
 
 ## Ordered Tasks
-1. TASK-2  Markdown 模式开关与实时预览
-2. TASK-5  删除流程重构（垃圾桶缓冲与彻底删除分离）
-3. TASK-4  文本快捷键（Tab格式化与自定义快捷）
-4. TASK-3  OCR 截图识别文字
-5. TASK-6  Linux Ubuntu 适配与打包验证
+1. TASK-13 Linux + Windows 跨平台全面测试
+2. TASK-14 自动发版（tag + GitHub Release）
+3. TASK-7  EPIC 第二轮体验优化与发版（OCR/WYSIWYG/主题/清理/架构图/测试/发布）
 
 ## Recent Runs
 - 2026-03-06T00:36:05Z TASK-2 ok - add note markdown live preview toggle; verified via `npm run verify`
@@ -29,3 +27,7 @@
 - 2026-03-06T09:24:27Z TASK-3 ok - add OCR screen capture + region select + insert into note; verified via `npm run verify`
 - 2026-03-06T10:37:17Z TASK-6 ok - add Linux deb packaging + Ubuntu notes; verified via `npm run verify` and `npm run pack:linux`
 - 2026-03-06T12:24:28Z TASK-1 ok - close epic + document feature changes for Ubuntu; verified via `npm run verify`
+- 2026-03-06T20:24:46Z TASK-8 ok - improve OCR download prompt, progress, friendly errors, retry; verified via `npm run verify`
+- 2026-03-06T22:39:36Z TASK-9 ok - WYSIWYG editor + source toggle + font size persistence; verified via `npm run verify`
+- 2026-03-07T00:30:40Z TASK-13 error - add windows coverage to CI + start test report; verified via `npm run verify` and `npm run pack:linux`
+- 2026-03-07T04:28:39Z TASK-13 ok - update Linux build verification + refresh test report; verified via `npm run verify` and `npm run pack:linux`

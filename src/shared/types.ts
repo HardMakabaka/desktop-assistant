@@ -3,6 +3,8 @@ export interface StickyNote {
   id: string;
   content: string;
   color: string;
+  /** 背景透明度 20-100（百分比），默认 100 */
+  opacity?: number;
   x: number;
   y: number;
   width: number;
