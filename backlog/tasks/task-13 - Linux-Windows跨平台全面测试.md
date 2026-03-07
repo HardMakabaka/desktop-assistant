@@ -80,6 +80,11 @@ references:
 - 测试报告（markdown），记录每项测试的通过/失败状态
 - 发现的问题记录为 bug 并修复后重测
 
+## Progress
+
+- 测试报告已创建：`backlog/docs/TASK-13-test-report.md`
+- CI 已补齐 Windows 覆盖：`.github/workflows/ci.yml`（`ubuntu-latest` + `windows-latest`）
+
 ## Acceptance Criteria
 - [ ] #1 Windows 上所有功能点通过测试
 - [ ] #2 Linux 上所有功能点通过测试（或有明确降级说明）

@@ -19,7 +19,12 @@ concurrency:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout
@@ -38,7 +43,13 @@ jobs:
         run: npm run verify
 
       - name: Install Linux packaging dependencies
+        if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y fakeroot
 
       - name: Validate Linux package build
+        if: runner.os == 'Linux'
         run: npm run pack:linux
+
+      - name: Validate Windows installer build
+        if: runner.os == 'Windows'
+        run: npm run pack
