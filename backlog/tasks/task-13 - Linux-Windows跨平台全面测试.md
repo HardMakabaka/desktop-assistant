@@ -21,6 +21,7 @@ references:
   - package.json
   - .github/workflows/ci.yml
   - .github/workflows/release.yml
+  - backlog/docs/linux-gui-test-plan.md
 ---
 
 ## Description
@@ -84,6 +85,7 @@ references:
 
 - 测试报告已创建：`backlog/docs/TASK-13-test-report.md`
 - CI 已补齐 Windows 覆盖：`.github/workflows/ci.yml`（`ubuntu-latest` + `windows-latest`）
+- Linux GUI 测试方案已补充：`backlog/docs/linux-gui-test-plan.md`
 
 ## Acceptance Criteria
 - [ ] #1 Windows 上所有功能点通过测试
