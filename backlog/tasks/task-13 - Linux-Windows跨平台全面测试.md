@@ -4,7 +4,7 @@ title: Linux + Windows 跨平台全面测试
 status: In Progress
 assignee: []
 created_date: '2026-03-06 18:56'
-updated_date: '2026-03-07 22:30'
+updated_date: '2026-03-08 00:30'
 labels:
   - testing
   - linux
@@ -83,6 +83,7 @@ references:
 ## Progress
 
 - 测试报告已创建：`backlog/docs/TASK-13-test-report.md`
+- 测试报告已更新：补充本次自动化验证通过与手动测试待完成说明（仍需在真实 Windows/Ubuntu 桌面环境回归 B~G）
 - CI 已补齐 Windows 覆盖：`.github/workflows/ci.yml`（`ubuntu-latest` + `windows-latest`）
 - CI 已验证通过（ubuntu-latest + windows-latest）：https://github.com/HardMakabaka/desktop-assistant/actions/runs/22806546617
 
