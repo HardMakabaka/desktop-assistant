@@ -33,3 +33,4 @@
 - 2026-03-07T04:28:39Z TASK-13 ok - update Linux build verification + refresh test report; verified via `npm run verify` and `npm run pack:linux`
 - 2026-03-07T22:30:09Z TASK-13 ok - record CI green + Windows pack validation in test report; verified via `npm run verify` and CI run 22806546617
 - 2026-03-08T00:30:26Z TASK-13 ok - refresh test report + document manual QA blockers; verified via `npm run verify`
+- 2026-03-08T02:27:30Z TASK-13 ok - mark CI/report acceptance items complete; manual QA still pending; verified via `npm run verify`

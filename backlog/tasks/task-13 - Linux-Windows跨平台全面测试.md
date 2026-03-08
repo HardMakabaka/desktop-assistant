@@ -4,7 +4,7 @@ title: Linux + Windows 跨平台全面测试
 status: In Progress
 assignee: []
 created_date: '2026-03-06 18:56'
-updated_date: '2026-03-08 00:30'
+updated_date: '2026-03-08 02:27'
 labels:
   - testing
   - linux
@@ -90,6 +90,6 @@ references:
 ## Acceptance Criteria
 - [ ] #1 Windows 上所有功能点通过测试
 - [ ] #2 Linux 上所有功能点通过测试（或有明确降级说明）
-- [ ] #3 CI 全绿
-- [ ] #4 输出测试报告
+- [x] #3 CI 全绿
+- [x] #4 输出测试报告
 - [ ] #5 所有发现的 bug 已修复并回归通过
