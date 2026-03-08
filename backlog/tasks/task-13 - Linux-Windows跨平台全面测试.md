@@ -4,7 +4,7 @@ title: Linux + Windows 跨平台全面测试
 status: In Progress
 assignee: []
 created_date: '2026-03-06 18:56'
-updated_date: '2026-03-08 02:27'
+updated_date: '2026-03-08 04:59'
 labels:
   - testing
   - linux
@@ -17,6 +17,7 @@ dependencies:
   - TASK-10
   - TASK-11
   - TASK-12
+  - TASK-15
 references:
   - package.json
   - .github/workflows/ci.yml

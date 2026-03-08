@@ -16,9 +16,10 @@
 - working_branch: ulw/desktop-assistant-auto
 
 ## Ordered Tasks
-1. TASK-13 Linux + Windows 跨平台全面测试
-2. TASK-14 自动发版（tag + GitHub Release）
-3. TASK-7  EPIC 第二轮体验优化与发版（OCR/WYSIWYG/主题/清理/架构图/测试/发布）
+1. TASK-15 Playwright Electron 自动化测试拆解
+2. TASK-13 Linux + Windows 跨平台全面测试
+3. TASK-14 自动发版（tag + GitHub Release）
+4. TASK-7  EPIC 第二轮体验优化与发版（OCR/WYSIWYG/主题/清理/架构图/测试/发布）
 
 ## Recent Runs
 - 2026-03-06T00:36:05Z TASK-2 ok - add note markdown live preview toggle; verified via `npm run verify`
