@@ -14,6 +14,7 @@
     "typecheck": "npm run typecheck:main && npm run typecheck:renderer",
     "test": "npm run typecheck && npm run build",
     "verify": "npm run test",
+    "openclaw:check": "node scripts/validate-openclaw-docs.mjs",
     "auto:commit": "node scripts/auto-commit.mjs",
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
