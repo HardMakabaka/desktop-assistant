@@ -350,6 +350,7 @@ const styles = {
     flex: 1,
     display: 'flex',
     minHeight: 0,
+    WebkitAppRegion: 'no-drag' as unknown as string,
   },
   preview: {
     flex: 1,
@@ -891,14 +892,47 @@ export function NoteWindow() {
         <div style={{ flex: 1, minHeight: 0 }} className="note-mdx">
           <style>{`
             .note-mdx {
+              display: flex;
+              min-height: 0;
               user-select: text;
+              -webkit-user-select: text;
+            }
+            .note-mdx .note-mdx-editor,
+            .note-mdx .mdxeditor-diff-source-wrapper,
+            .note-mdx .mdxeditor-rich-text-editor {
+              display: flex;
+              flex: 1;
+              min-height: 0;
+              overflow: hidden;
+            }
+            .note-mdx .mdxeditor-diff-source-wrapper {
+              flex-direction: column;
+            }
+            .note-mdx .mdxeditor-source-editor,
+            .note-mdx .cm-editor {
+              flex: 1;
+              min-height: 0;
+            }
+            .note-mdx .cm-scroller,
+            .note-mdx .mdxeditor-root-contenteditable {
+              display: flex;
+              flex: 1;
+              min-height: 0;
+              overflow: auto;
+              overscroll-behavior: contain;
+            }
+            .note-mdx .mdxeditor-root-contenteditable > div {
+              display: flex;
+              flex: 1;
+              min-height: 100%;
             }
             .note-mdx .note-mdx-prose {
+              flex: 1;
+              min-height: 100%;
               font-size: ${noteFontSize}px;
               line-height: 1.6;
               color: rgba(0,0,0,0.82);
               padding: 8px 14px 14px;
-              min-height: 100%;
               outline: none;
             }
           `}</style>
