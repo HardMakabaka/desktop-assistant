@@ -22,6 +22,8 @@
 - [ ] Create note, edit, save
 - [ ] WYSIWYG mode: typing renders as expected
 - [ ] Source mode toggle: no content loss
+- [ ] Long note content scrolls in WYSIWYG mode
+- [ ] Long note content scrolls in source mode
 - [ ] Font size: up/down + persists after reopen
 - [ ] Background color picker + opacity control
 - [ ] Shortcuts: Tab indent, custom shortcuts, restore defaults
@@ -52,7 +54,15 @@
 - [ ] Notes + Calendar + OCR can run together
 - [ ] Closing windows releases resources normally
 
-## G. Platform Differences
+## G. UI Interaction
+
+- [ ] Main panel controls are visible and not clipped
+- [ ] Note window buttons in `no-drag` area are clickable
+- [ ] Long lists / long note content can scroll with mouse wheel or touchpad-equivalent wheel events
+- [ ] Shortcut modal / color picker opens at correct layer and can close normally
+- [ ] UI still works at small window size without critical overlap
+
+## H. Platform Differences
 
 - [ ] Windows: screenshot API, Ctrl mappings, installer works
 - [ ] Linux (Ubuntu): Wayland/X11 screenshot, shortcuts, deb install
