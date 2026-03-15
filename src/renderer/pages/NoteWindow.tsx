@@ -300,39 +300,76 @@ function applyOutdentFormatting(
   };
 }
 
+const SERIF_STACK = '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, "STSong", "SimSun", serif';
+const SANS_STACK = '"Avenir Next", "Trebuchet MS", "Microsoft YaHei", sans-serif';
+
 const styles = {
   container: {
     height: '100vh',
     position: 'relative' as const,
     display: 'flex',
     flexDirection: 'column' as const,
-    borderRadius: '10px',
+    borderRadius: '16px',
     overflow: 'hidden',
-    boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+    fontFamily: SANS_STACK,
+    boxShadow: '0 18px 54px rgba(29, 23, 17, 0.18)',
   },
   header: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '6px 8px',
+    gap: '8px',
+    padding: '8px 10px',
     WebkitAppRegion: 'drag' as unknown as string,
-    minHeight: '32px',
+    minHeight: '48px',
+    borderBottom: '1px solid rgba(73, 55, 37, 0.08)',
+    backdropFilter: 'blur(14px)',
   },
   headerActions: {
     display: 'flex',
-    gap: '4px',
+    gap: '5px',
     WebkitAppRegion: 'no-drag' as unknown as string,
   },
+  headerMeta: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 0,
+    gap: '2px',
+    textAlign: 'center' as const,
+    color: 'rgba(46, 35, 24, 0.8)',
+  },
+  headerEyebrow: {
+    fontSize: '10px',
+    letterSpacing: '0.16em',
+    textTransform: 'uppercase' as const,
+    color: 'rgba(65, 50, 37, 0.52)',
+    fontWeight: 700,
+  },
+  headerTitle: {
+    fontSize: '17px',
+    lineHeight: 1.1,
+    fontWeight: 700,
+    fontFamily: SERIF_STACK,
+    letterSpacing: '-0.03em',
+    color: '#31271d',
+  },
+  headerSubtitle: {
+    fontSize: '11px',
+    color: 'rgba(65, 50, 37, 0.64)',
+  },
   iconBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: '50%',
+    minWidth: 26,
+    height: 26,
+    borderRadius: '10px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '12px',
-    color: 'rgba(0,0,0,0.5)',
-    transition: 'background 0.15s, color 0.15s',
+    color: 'rgba(47, 37, 28, 0.72)',
+    background: 'rgba(255,255,255,0.22)',
+    transition: 'background 0.15s, color 0.15s, transform 0.15s',
   },
   textarea: {
     flex: 1,
@@ -341,16 +378,17 @@ const styles = {
     resize: 'none' as const,
     padding: '8px 14px 14px',
     fontSize: '14px',
-    lineHeight: '1.6',
-    fontFamily: 'inherit',
+    lineHeight: '1.75',
+    fontFamily: SERIF_STACK,
     background: 'transparent',
-    color: 'rgba(0,0,0,0.8)',
+    color: 'rgba(39,30,22,0.82)',
   },
   body: {
     flex: 1,
     display: 'flex',
     minHeight: 0,
     WebkitAppRegion: 'no-drag' as unknown as string,
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.1), rgba(255,250,239,0.24))',
   },
   preview: {
     flex: 1,
@@ -360,15 +398,21 @@ const styles = {
     color: 'rgba(0,0,0,0.8)',
   },
   footer: {
-    padding: '4px 10px 6px',
+    padding: '6px 12px 8px',
     fontSize: '10px',
-    color: 'rgba(0,0,0,0.3)',
-    textAlign: 'right' as const,
+    color: 'rgba(55, 43, 31, 0.42)',
+    borderTop: '1px solid rgba(73, 55, 37, 0.08)',
+    background: 'rgba(255,255,255,0.16)',
+  },
+  footerHint: {
+    fontSize: '10px',
+    letterSpacing: '0.04em',
+    color: 'rgba(55, 43, 31, 0.5)',
   },
   modalOverlay: {
     position: 'absolute' as const,
     inset: 0,
-    background: 'rgba(0,0,0,0.25)',
+    background: 'rgba(17,12,8,0.26)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -377,44 +421,47 @@ const styles = {
   },
   modal: {
     width: '100%',
-    maxWidth: 340,
-    borderRadius: 12,
-    background: 'rgba(255,255,255,0.96)',
-    boxShadow: '0 12px 40px rgba(0,0,0,0.25)',
-    padding: '12px 12px 10px',
+    maxWidth: 352,
+    borderRadius: 16,
+    background: 'linear-gradient(180deg, rgba(255,252,247,0.98), rgba(248,241,229,0.96))',
+    boxShadow: '0 18px 44px rgba(18,13,9,0.26)',
+    padding: '14px 14px 12px',
+    border: '1px solid rgba(73,55,37,0.08)',
   },
   modalTitle: {
-    fontSize: 13,
+    fontSize: 17,
     fontWeight: 700,
     margin: '0 0 10px',
-    color: 'rgba(0,0,0,0.82)',
+    color: '#31271d',
+    fontFamily: SERIF_STACK,
+    letterSpacing: '-0.03em',
   },
   shortcutRow: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    padding: '6px 0',
-    borderTop: '1px solid rgba(0,0,0,0.06)',
+    padding: '8px 0',
+    borderTop: '1px solid rgba(73,55,37,0.08)',
   },
   shortcutLabel: {
     fontSize: 12,
-    color: 'rgba(0,0,0,0.7)',
+    color: 'rgba(55,43,31,0.74)',
   },
   shortcutValue: {
     fontSize: 12,
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-    color: 'rgba(0,0,0,0.82)',
-    background: 'rgba(0,0,0,0.06)',
-    padding: '2px 6px',
-    borderRadius: 6,
+    color: 'rgba(40,31,23,0.82)',
+    background: 'rgba(73,55,37,0.08)',
+    padding: '3px 7px',
+    borderRadius: 7,
     userSelect: 'text' as const,
   },
   modalActions: {
     display: 'flex',
     justifyContent: 'space-between',
     gap: 8,
-    marginTop: 10,
+    marginTop: 12,
   },
 };
 
@@ -774,15 +821,16 @@ export function NoteWindow() {
   const noteOpacity = note.opacity ?? 100;
   const bgRgba = hexToRgba(note.color, noteOpacity);
   const headerBg = darkenColor(note.color, 15);
+  const noteModeLabel = livePreviewEnabled ? '所见即所得' : '源码书写';
 
   return (
     <div style={{ ...styles.container, background: bgRgba }}>
-      <div style={{ ...styles.header, background: headerBg }}>
+      <div style={{ ...styles.header, background: `linear-gradient(180deg, ${headerBg}, ${darkenColor(note.color, 24)})` }}>
         <div style={styles.headerActions}>
           <button
             style={{
               ...styles.iconBtn,
-              color: pinned ? '#e53935' : 'rgba(0,0,0,0.5)',
+              color: pinned ? '#a5241a' : 'rgba(44,34,25,0.7)',
             }}
             onClick={handlePin}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
@@ -874,6 +922,11 @@ export function NoteWindow() {
             🎨
           </button>
         </div>
+        <div style={styles.headerMeta}>
+          <span style={styles.headerEyebrow}>Paper Note</span>
+          <span style={styles.headerTitle}>桌面便签</span>
+          <span style={styles.headerSubtitle}>{noteModeLabel} · {noteFontSize}px</span>
+        </div>
         <div style={styles.headerActions}>
           <button
             style={styles.iconBtn}
@@ -932,10 +985,28 @@ export function NoteWindow() {
               width: 100%;
               min-height: 100%;
               font-size: ${noteFontSize}px;
-              line-height: 1.6;
-              color: rgba(0,0,0,0.82);
-              padding: 8px 14px 14px;
+              line-height: 1.8;
+              color: rgba(39,30,22,0.84);
+              padding: 10px 16px 18px;
               outline: none;
+              font-family: ${SERIF_STACK};
+            }
+            .note-mdx .note-mdx-prose p,
+            .note-mdx .note-mdx-prose li {
+              letter-spacing: 0.01em;
+            }
+            .note-mdx .note-mdx-prose h1,
+            .note-mdx .note-mdx-prose h2,
+            .note-mdx .note-mdx-prose h3 {
+              font-family: ${SERIF_STACK};
+              color: rgba(36,29,22,0.92);
+              letter-spacing: -0.03em;
+            }
+            .note-mdx .note-mdx-prose blockquote {
+              margin: 0.8em 0;
+              padding-left: 12px;
+              border-left: 2px solid rgba(88, 66, 43, 0.22);
+              color: rgba(66, 52, 39, 0.72);
             }
           `}</style>
 
@@ -959,8 +1030,8 @@ export function NoteWindow() {
         </div>
       </div>
 
-      <div style={{ ...styles.footer, display: 'flex', justifyContent: 'space-between' }}>
-        <span>{actionHint}</span>
+      <div style={{ ...styles.footer, display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+        <span style={styles.footerHint}>{actionHint || '写一点今天要记住的话。'}</span>
         <span>{new Date(note.updatedAt).toLocaleString('zh-CN')}</span>
       </div>
 

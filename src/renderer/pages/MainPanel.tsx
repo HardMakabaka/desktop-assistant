@@ -32,46 +32,54 @@ const shiftHex = (hex: string, amount: number): string => {
   return `#${channels.map(channel => channel.toString(16).padStart(2, '0')).join('')}`;
 };
 
+const SERIF_STACK = '"Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, "STSong", "SimSun", serif';
+const SANS_STACK = '"Avenir Next", "Trebuchet MS", "Microsoft YaHei", sans-serif';
+
 const styles: Record<string, DesktopStyle> = {
   container: {
     height: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    color: '#1c2430',
+    fontFamily: SANS_STACK,
+    color: '#1f2731',
     background:
-      'radial-gradient(circle at top left, rgba(255, 210, 122, 0.52), transparent 30%), radial-gradient(circle at bottom right, rgba(55, 186, 146, 0.2), transparent 34%), linear-gradient(160deg, #fbf3dc 0%, #f4e0bf 48%, #ead5b2 100%)',
+      'radial-gradient(circle at top left, rgba(255, 232, 181, 0.78), transparent 28%), radial-gradient(circle at 85% 12%, rgba(132, 173, 155, 0.2), transparent 24%), radial-gradient(circle at bottom right, rgba(176, 142, 112, 0.14), transparent 30%), linear-gradient(162deg, #f7ecd2 0%, #f0dfbf 46%, #e7d4b3 100%)',
   },
   titleBar: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: '12px',
-    padding: '18px 18px 10px',
+    padding: '20px 20px 12px',
     position: 'relative',
     WebkitAppRegion: 'drag' as unknown as string,
   },
   titleGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
+    gap: '5px',
     minWidth: 0,
   },
   eyebrow: {
     fontSize: '11px',
-    letterSpacing: '0.12em',
+    letterSpacing: '0.18em',
     textTransform: 'uppercase',
-    color: 'rgba(28,36,48,0.58)',
+    color: 'rgba(58, 49, 38, 0.56)',
     fontWeight: 700,
   },
   title: {
-    fontSize: '28px',
+    fontSize: '31px',
     lineHeight: 1,
-    fontWeight: 800,
-    letterSpacing: '-0.03em',
+    fontWeight: 700,
+    letterSpacing: '-0.04em',
+    fontFamily: SERIF_STACK,
+    color: '#31271d',
   },
   subtitle: {
     fontSize: '13px',
-    color: 'rgba(28,36,48,0.72)',
+    lineHeight: 1.55,
+    color: 'rgba(43, 47, 54, 0.72)',
+    maxWidth: '320px',
   },
   titleActions: {
     display: 'flex',
@@ -83,27 +91,28 @@ const styles: Record<string, DesktopStyle> = {
     position: 'relative',
   },
   iconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: '12px',
+    width: 36,
+    height: 36,
+    borderRadius: '14px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#1c2430',
+    color: '#2d241a',
     fontSize: '15px',
     transition: 'transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease',
-    background: 'rgba(255,255,255,0.36)',
-    boxShadow: '0 10px 24px rgba(28,36,48,0.08)',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,250,240,0.34))',
+    border: '1px solid rgba(73, 55, 37, 0.08)',
+    boxShadow: '0 12px 30px rgba(51, 38, 26, 0.08)',
   },
   settingsMenu: {
     position: 'absolute',
-    top: '40px',
+    top: '42px',
     right: 0,
-    minWidth: '160px',
-    background: 'rgba(28,36,48,0.94)',
-    border: '1px solid rgba(255,255,255,0.14)',
-    borderRadius: '14px',
-    boxShadow: '0 16px 36px rgba(10, 14, 20, 0.25)',
+    minWidth: '176px',
+    background: 'rgba(32, 35, 41, 0.95)',
+    border: '1px solid rgba(255,245,225,0.16)',
+    borderRadius: '16px',
+    boxShadow: '0 20px 46px rgba(10, 14, 20, 0.28)',
     padding: '8px',
     zIndex: 20,
   },
@@ -111,10 +120,10 @@ const styles: Record<string, DesktopStyle> = {
     width: '100%',
     border: 'none',
     background: 'transparent',
-    color: '#fffdf7',
+    color: '#fffaf0',
     fontSize: '13px',
     textAlign: 'left',
-    borderRadius: '10px',
+    borderRadius: '12px',
     padding: '10px 12px',
     transition: 'background 0.18s ease',
     WebkitAppRegion: 'no-drag' as unknown as string,
@@ -123,38 +132,42 @@ const styles: Record<string, DesktopStyle> = {
   body: {
     flex: 1,
     minHeight: 0,
-    padding: '0 18px 18px',
+    padding: '0 20px 20px',
     overflowY: 'auto',
     WebkitAppRegion: 'no-drag' as unknown as string,
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '18px',
   },
   heroCard: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 0.8fr)',
-    gap: '14px',
-    padding: '16px',
-    borderRadius: '24px',
-    background: 'linear-gradient(145deg, rgba(255,255,255,0.6), rgba(255,244,222,0.82))',
-    border: '1px solid rgba(28,36,48,0.08)',
-    boxShadow: '0 22px 60px rgba(28,36,48,0.1)',
+    gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 0.82fr)',
+    gap: '16px',
+    padding: '20px',
+    borderRadius: '28px',
+    background: 'linear-gradient(155deg, rgba(255,252,246,0.72), rgba(252,241,219,0.88))',
+    border: '1px solid rgba(73, 55, 37, 0.1)',
+    boxShadow: '0 24px 64px rgba(39, 29, 19, 0.12)',
   },
   heroMain: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    justifyContent: 'space-between',
+    gap: '12px',
   },
   heroTitle: {
-    fontSize: '22px',
-    lineHeight: 1.15,
-    fontWeight: 800,
-    letterSpacing: '-0.03em',
+    fontSize: '25px',
+    lineHeight: 1.14,
+    fontWeight: 700,
+    letterSpacing: '-0.035em',
+    fontFamily: SERIF_STACK,
+    color: '#2d241a',
   },
   heroText: {
     fontSize: '13px',
-    lineHeight: 1.65,
-    color: 'rgba(28,36,48,0.7)',
+    lineHeight: 1.72,
+    color: 'rgba(45, 39, 31, 0.72)',
+    maxWidth: '420px',
   },
   heroMeta: {
     display: 'flex',
@@ -162,66 +175,79 @@ const styles: Record<string, DesktopStyle> = {
     flexWrap: 'wrap',
   },
   heroChip: {
-    padding: '6px 10px',
+    padding: '7px 11px',
     borderRadius: '999px',
-    background: 'rgba(28,36,48,0.06)',
+    background: 'rgba(82, 62, 41, 0.08)',
+    border: '1px solid rgba(82, 62, 41, 0.08)',
     fontSize: '12px',
     fontWeight: 700,
-    color: 'rgba(28,36,48,0.76)',
+    color: 'rgba(56, 45, 33, 0.78)',
   },
   heroAside: {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    gap: '10px',
-    padding: '14px',
-    borderRadius: '18px',
-    background: 'linear-gradient(145deg, rgba(40, 78, 67, 0.92), rgba(26, 41, 51, 0.98))',
-    color: '#fff8e7',
+    gap: '12px',
+    padding: '18px',
+    borderRadius: '22px',
+    background: 'linear-gradient(150deg, rgba(50, 73, 69, 0.96), rgba(29, 36, 43, 0.98))',
+    color: '#fff7ea',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
   },
   heroAsideLabel: {
     fontSize: '11px',
-    letterSpacing: '0.12em',
+    letterSpacing: '0.16em',
     textTransform: 'uppercase',
-    color: 'rgba(255,248,231,0.7)',
+    color: 'rgba(255,247,234,0.68)',
     fontWeight: 700,
   },
   heroAsideValue: {
-    fontSize: '34px',
+    fontSize: '38px',
     lineHeight: 1,
-    fontWeight: 800,
-    letterSpacing: '-0.04em',
+    fontWeight: 700,
+    letterSpacing: '-0.045em',
+    fontFamily: SERIF_STACK,
   },
   heroAsideText: {
     fontSize: '12px',
-    lineHeight: 1.6,
-    color: 'rgba(255,248,231,0.78)',
+    lineHeight: 1.68,
+    color: 'rgba(255,247,234,0.8)',
   },
   feedbackError: {
     fontSize: '13px',
-    color: '#8c1d18',
+    color: '#7a211b',
     background: 'rgba(241, 130, 120, 0.18)',
     border: '1px solid rgba(140,29,24,0.16)',
-    borderRadius: '14px',
+    borderRadius: '16px',
     padding: '12px 14px',
   },
   feedbackSuccess: {
     fontSize: '13px',
-    color: '#0d5131',
+    color: '#164f35',
     background: 'rgba(97, 204, 153, 0.18)',
     border: '1px solid rgba(13,81,49,0.16)',
-    borderRadius: '14px',
+    borderRadius: '16px',
     padding: '12px 14px',
   },
   sectionCard: {
     display: 'flex',
     flexDirection: 'column',
     gap: '14px',
-    padding: '16px',
-    borderRadius: '22px',
-    background: 'rgba(255, 250, 239, 0.72)',
-    border: '1px solid rgba(28,36,48,0.08)',
-    boxShadow: '0 18px 44px rgba(28,36,48,0.08)',
+    padding: '18px',
+    borderRadius: '24px',
+    background: 'linear-gradient(180deg, rgba(255,252,247,0.62), rgba(255,248,236,0.8))',
+    border: '1px solid rgba(73, 55, 37, 0.08)',
+    boxShadow: '0 18px 44px rgba(35, 27, 20, 0.08)',
+  },
+  section: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '14px',
+    padding: '18px',
+    borderRadius: '24px',
+    background: 'linear-gradient(180deg, rgba(255,249,239,0.58), rgba(251,240,222,0.78))',
+    border: '1px solid rgba(73, 55, 37, 0.08)',
+    boxShadow: '0 18px 44px rgba(35, 27, 20, 0.08)',
   },
   sectionHeading: {
     display: 'flex',
@@ -230,13 +256,15 @@ const styles: Record<string, DesktopStyle> = {
     gap: '10px',
   },
   sectionTitle: {
-    fontSize: '17px',
-    fontWeight: 800,
-    letterSpacing: '-0.02em',
+    fontSize: '19px',
+    fontWeight: 700,
+    letterSpacing: '-0.03em',
+    fontFamily: SERIF_STACK,
+    color: '#31271d',
   },
   sectionHint: {
     fontSize: '12px',
-    color: 'rgba(28,36,48,0.58)',
+    color: 'rgba(49, 39, 29, 0.56)',
   },
   actionGrid: {
     display: 'grid',
@@ -247,66 +275,70 @@ const styles: Record<string, DesktopStyle> = {
     display: 'flex',
     flexDirection: 'column',
     gap: '14px',
-    borderRadius: '18px',
-    padding: '16px',
-    minHeight: '136px',
+    borderRadius: '20px',
+    padding: '18px',
+    minHeight: '146px',
     cursor: 'pointer',
     transition: 'transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease',
     WebkitAppRegion: 'no-drag' as unknown as string,
-    boxShadow: '0 14px 28px rgba(28,36,48,0.12)',
+    boxShadow: '0 16px 34px rgba(28,36,48,0.12)',
   },
   actionIcon: {
-    width: '44px',
-    height: '44px',
-    borderRadius: '14px',
+    width: '46px',
+    height: '46px',
+    borderRadius: '16px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '22px',
-    background: 'rgba(255,255,255,0.22)',
+    fontSize: '23px',
+    background: 'rgba(255,255,255,0.18)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.18)',
   },
   actionLabel: {
-    fontSize: '17px',
-    fontWeight: 800,
-    letterSpacing: '-0.02em',
+    fontSize: '18px',
+    fontWeight: 700,
+    letterSpacing: '-0.03em',
+    fontFamily: SERIF_STACK,
   },
   actionDesc: {
     fontSize: '12px',
-    lineHeight: 1.6,
-    opacity: 0.84,
+    lineHeight: 1.7,
+    opacity: 0.88,
   },
   noteList: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '12px',
   },
   noteItem: {
     display: 'grid',
     gridTemplateColumns: 'auto minmax(0, 1fr) auto',
     gap: '12px',
     alignItems: 'center',
-    padding: '14px',
-    borderRadius: '18px',
+    padding: '15px',
+    borderRadius: '20px',
     cursor: 'pointer',
     transition: 'transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease',
     WebkitAppRegion: 'no-drag' as unknown as string,
   },
   noteColor: {
-    width: 14,
-    height: 46,
+    width: 15,
+    height: 52,
     borderRadius: '999px',
     flexShrink: 0,
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.26)',
   },
   noteContent: {
     minWidth: 0,
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
+    gap: '7px',
   },
   noteText: {
-    fontSize: '14px',
-    lineHeight: 1.5,
-    color: 'rgba(28,36,48,0.88)',
+    fontSize: '15px',
+    lineHeight: 1.6,
+    color: 'rgba(33,31,30,0.88)',
+    fontFamily: SERIF_STACK,
     display: '-webkit-box',
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
@@ -323,26 +355,28 @@ const styles: Record<string, DesktopStyle> = {
   noteMetaChip: {
     padding: '4px 8px',
     borderRadius: '999px',
-    background: 'rgba(255,255,255,0.44)',
+    background: 'rgba(255,255,255,0.52)',
+    border: '1px solid rgba(73, 55, 37, 0.06)',
     fontWeight: 700,
   },
   noteDelete: {
     color: 'rgba(28,36,48,0.5)',
     fontSize: '15px',
     padding: '8px',
-    borderRadius: '10px',
+    borderRadius: '12px',
     transition: 'background 0.18s ease, color 0.18s ease',
     WebkitAppRegion: 'no-drag' as unknown as string,
   },
   empty: {
     textAlign: 'center',
-    color: 'rgba(28,36,48,0.54)',
+    color: 'rgba(49,39,29,0.56)',
     fontSize: '13px',
-    lineHeight: 1.7,
-    padding: '26px 12px',
-    borderRadius: '18px',
-    background: 'rgba(255,255,255,0.42)',
-    border: '1px dashed rgba(28,36,48,0.14)',
+    lineHeight: 1.8,
+    padding: '28px 16px',
+    borderRadius: '20px',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.44), rgba(255,249,239,0.72))',
+    border: '1px dashed rgba(73, 55, 37, 0.16)',
+    fontFamily: SERIF_STACK,
   },
 };
 
@@ -502,9 +536,9 @@ export function MainPanel() {
     <div style={styles.container}>
       <div style={styles.titleBar}>
         <div style={styles.titleGroup}>
-          <span style={styles.eyebrow}>Desktop Assistant</span>
+          <span style={styles.eyebrow}>Writing Desk</span>
           <span style={styles.title}>桌面助手</span>
-          <span style={styles.subtitle}>便签和日历放在同一个顺手、安静、能长期打开的控制台里。</span>
+          <span style={styles.subtitle}>把便签、日历和临时灵感收进一张安静的书桌里，打开时像翻开今天的手帐。</span>
         </div>
 
         <div style={styles.titleActions}>
@@ -559,9 +593,9 @@ export function MainPanel() {
       <div style={styles.body}>
         <div style={styles.heroCard}>
           <div style={styles.heroMain}>
-            <span style={styles.heroTitle}>把零碎想法留在桌面上，而不是留在脑子里。</span>
+            <span style={styles.heroTitle}>让零碎想法有地方落脚，像把纸页轻轻摊开在桌面上。</span>
             <span style={styles.heroText}>
-              新建便签、随手固定窗口、快速回看历史记录。主面板现在走一套更温暖的纸张质感，和便签窗口的视觉语言也统一了。
+              新建便签、固定提醒、翻看旧页，再把日期与计划折回日历。这里不追求喧闹，而是把常用动作整理成一块顺手、安静、带一点纸张气味的工作台。
             </span>
             <div style={styles.heroMeta}>
               <span style={styles.heroChip}>{notes.length} 张便签</span>
@@ -571,9 +605,9 @@ export function MainPanel() {
           </div>
 
           <div style={styles.heroAside}>
-            <span style={styles.heroAsideLabel}>Notes online</span>
+            <span style={styles.heroAsideLabel}>Open pages</span>
             <span style={styles.heroAsideValue}>{notes.length}</span>
-            <span style={styles.heroAsideText}>打开任意便签后，即使窗口缩小，正文区域也会保持可滚动，长内容不再被闷住。</span>
+            <span style={styles.heroAsideText}>像书页一样把事项摊开：今天写下的句子、待办和灵感，都能在桌面上停得住，也翻得动。</span>
           </div>
         </div>
 
@@ -611,7 +645,7 @@ export function MainPanel() {
             >
               <span style={styles.actionIcon}>📝</span>
               <span style={styles.actionLabel}>新建便签</span>
-              <span style={styles.actionDesc}>开一个新窗口，适合临时记录、待办拆分和桌面固定提醒。</span>
+              <span style={styles.actionDesc}>摊开一张新的纸页，适合临时记录、拆分待办，或者把一句提醒留在桌面上。</span>
             </div>
 
             <div
@@ -638,7 +672,7 @@ export function MainPanel() {
             >
               <span style={styles.actionIcon}>📅</span>
               <span style={styles.actionLabel}>打开日历</span>
-              <span style={styles.actionDesc}>查看日期标记，把计划和便签窗口放在一起，用起来更顺手。</span>
+              <span style={styles.actionDesc}>把日子钉上颜色和短句，让计划不只是日期，而像一页有标注的月历。</span>
             </div>
           </div>
         </div>
@@ -650,7 +684,7 @@ export function MainPanel() {
           </div>
 
           {notes.length === 0 ? (
-            <div style={styles.empty}>还没有便签。点上面的“新建便签”，先把今天脑子里最吵的一件事写下来。</div>
+            <div style={styles.empty}>还没有便签。点上面的“新建便签”，先把今天脑子里最吵的一句话、最急的一件事，写下来安放好。</div>
           ) : (
             <div style={styles.noteList}>
               {notes.map(note => {
@@ -716,9 +750,12 @@ export function MainPanel() {
         </div>
 
         <div style={styles.section}>
-          <div style={styles.sectionTitle}>垃圾桶 ({trashedNotes.length})</div>
+          <div style={styles.sectionHeading}>
+            <span style={styles.sectionTitle}>垃圾桶</span>
+            <span style={styles.sectionHint}>{trashedNotes.length === 0 ? '没有遗落纸页' : `${trashedNotes.length} 条待处理`}</span>
+          </div>
           {trashedNotes.length === 0 ? (
-            <div style={styles.empty}>垃圾桶为空</div>
+            <div style={styles.empty}>垃圾桶还是空的，像今天还没来得及揉皱的草稿纸。</div>
           ) : (
             <div style={styles.noteList}>
               {trashedNotes.map(note => (
