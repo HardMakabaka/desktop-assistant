@@ -900,13 +900,11 @@ export function NoteWindow() {
             .note-mdx .note-mdx-editor,
             .note-mdx .mdxeditor-diff-source-wrapper,
             .note-mdx .mdxeditor-rich-text-editor {
-              display: flex;
-              flex: 1;
-              min-height: 0;
-              overflow: hidden;
-            }
-            .note-mdx .mdxeditor-diff-source-wrapper {
-              flex-direction: column;
+              display: flex !important;
+              flex: 1 1 0 !important;
+              flex-direction: column !important;
+              min-height: 0 !important;
+              overflow: hidden !important;
             }
             .note-mdx .mdxeditor-source-editor,
             .note-mdx .cm-editor {

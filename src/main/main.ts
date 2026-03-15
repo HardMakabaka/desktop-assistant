@@ -509,7 +509,7 @@ function setupAutoUpdater(): void {
 }
 
 // App lifecycle
-const gotSingleInstanceLock = app.requestSingleInstanceLock();
+const gotSingleInstanceLock = process.env.DESKTOP_ASSISTANT_E2E === '1' ? true : app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock) {
   app.quit();
