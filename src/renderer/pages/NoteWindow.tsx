@@ -913,21 +913,25 @@ export function NoteWindow() {
               flex: 1;
               min-height: 0;
             }
+            .note-mdx .cm-editor {
+              height: 100%;
+            }
             .note-mdx .cm-scroller,
             .note-mdx .mdxeditor-root-contenteditable {
-              display: flex;
               flex: 1;
               min-height: 0;
-              overflow: auto;
+              overflow-x: hidden;
+              overflow-y: auto;
               overscroll-behavior: contain;
+              scrollbar-gutter: stable;
             }
             .note-mdx .mdxeditor-root-contenteditable > div {
-              display: flex;
-              flex: 1;
+              display: block;
               min-height: 100%;
             }
             .note-mdx .note-mdx-prose {
-              flex: 1;
+              display: block;
+              width: 100%;
               min-height: 100%;
               font-size: ${noteFontSize}px;
               line-height: 1.6;
