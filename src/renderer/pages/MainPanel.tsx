@@ -41,9 +41,9 @@ const styles: Record<string, DesktopStyle> = {
     display: 'flex',
     flexDirection: 'column',
     fontFamily: SANS_STACK,
-    color: '#1f2731',
+    color: '#25303a',
     background:
-      'radial-gradient(circle at top left, rgba(255, 232, 181, 0.78), transparent 28%), radial-gradient(circle at 85% 12%, rgba(132, 173, 155, 0.2), transparent 24%), radial-gradient(circle at bottom right, rgba(176, 142, 112, 0.14), transparent 30%), linear-gradient(162deg, #f7ecd2 0%, #f0dfbf 46%, #e7d4b3 100%)',
+      'radial-gradient(circle at top left, rgba(255, 208, 214, 0.58), transparent 26%), radial-gradient(circle at 82% 14%, rgba(177, 224, 214, 0.42), transparent 24%), radial-gradient(circle at bottom right, rgba(255, 233, 184, 0.3), transparent 28%), linear-gradient(165deg, #fff6ef 0%, #f8efe6 44%, #f3eadf 100%)',
   },
   titleBar: {
     display: 'flex',
@@ -93,16 +93,16 @@ const styles: Record<string, DesktopStyle> = {
   iconBtn: {
     width: 36,
     height: 36,
-    borderRadius: '14px',
+    borderRadius: '16px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    color: '#2d241a',
+    color: '#3b3127',
     fontSize: '15px',
     transition: 'transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease',
-    background: 'linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,250,240,0.34))',
-    border: '1px solid rgba(73, 55, 37, 0.08)',
-    boxShadow: '0 12px 30px rgba(51, 38, 26, 0.08)',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.84), rgba(255,246,240,0.56))',
+    border: '1px solid rgba(119, 92, 74, 0.08)',
+    boxShadow: '0 10px 24px rgba(93, 75, 61, 0.08)',
   },
   settingsMenu: {
     position: 'absolute',
@@ -144,10 +144,10 @@ const styles: Record<string, DesktopStyle> = {
     gridTemplateColumns: 'minmax(0, 1.25fr) minmax(0, 0.82fr)',
     gap: '16px',
     padding: '20px',
-    borderRadius: '28px',
-    background: 'linear-gradient(155deg, rgba(255,252,246,0.72), rgba(252,241,219,0.88))',
-    border: '1px solid rgba(73, 55, 37, 0.1)',
-    boxShadow: '0 24px 64px rgba(39, 29, 19, 0.12)',
+    borderRadius: '30px',
+    background: 'linear-gradient(155deg, rgba(255,255,255,0.88), rgba(255,245,237,0.96))',
+    border: '1px solid rgba(122, 96, 81, 0.08)',
+    boxShadow: '0 22px 54px rgba(67, 53, 42, 0.1)',
   },
   heroMain: {
     display: 'flex',
@@ -177,11 +177,11 @@ const styles: Record<string, DesktopStyle> = {
   heroChip: {
     padding: '7px 11px',
     borderRadius: '999px',
-    background: 'rgba(82, 62, 41, 0.08)',
-    border: '1px solid rgba(82, 62, 41, 0.08)',
+    background: 'rgba(255, 214, 220, 0.4)',
+    border: '1px solid rgba(196, 158, 164, 0.16)',
     fontSize: '12px',
     fontWeight: 700,
-    color: 'rgba(56, 45, 33, 0.78)',
+    color: 'rgba(88, 62, 68, 0.82)',
   },
   heroAside: {
     display: 'flex',
@@ -189,16 +189,17 @@ const styles: Record<string, DesktopStyle> = {
     justifyContent: 'space-between',
     gap: '12px',
     padding: '18px',
-    borderRadius: '22px',
-    background: 'linear-gradient(150deg, rgba(50, 73, 69, 0.96), rgba(29, 36, 43, 0.98))',
-    color: '#fff7ea',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+    borderRadius: '24px',
+    background: 'linear-gradient(155deg, rgba(212, 242, 234, 0.96), rgba(245, 255, 251, 0.94))',
+    color: '#2f4b46',
+    border: '1px solid rgba(116, 170, 157, 0.16)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.62)',
   },
   heroAsideLabel: {
     fontSize: '11px',
     letterSpacing: '0.16em',
     textTransform: 'uppercase',
-    color: 'rgba(255,247,234,0.68)',
+    color: 'rgba(47, 75, 70, 0.54)',
     fontWeight: 700,
   },
   heroAsideValue: {
@@ -207,11 +208,12 @@ const styles: Record<string, DesktopStyle> = {
     fontWeight: 700,
     letterSpacing: '-0.045em',
     fontFamily: SERIF_STACK,
+    color: '#2f4b46',
   },
   heroAsideText: {
     fontSize: '12px',
     lineHeight: 1.68,
-    color: 'rgba(255,247,234,0.8)',
+    color: 'rgba(47, 75, 70, 0.74)',
   },
   feedbackError: {
     fontSize: '13px',
@@ -234,20 +236,20 @@ const styles: Record<string, DesktopStyle> = {
     flexDirection: 'column',
     gap: '14px',
     padding: '18px',
-    borderRadius: '24px',
-    background: 'linear-gradient(180deg, rgba(255,252,247,0.62), rgba(255,248,236,0.8))',
-    border: '1px solid rgba(73, 55, 37, 0.08)',
-    boxShadow: '0 18px 44px rgba(35, 27, 20, 0.08)',
+    borderRadius: '26px',
+    background: 'linear-gradient(180deg, rgba(255,255,255,0.74), rgba(255,248,244,0.88))',
+    border: '1px solid rgba(122, 96, 81, 0.08)',
+    boxShadow: '0 16px 36px rgba(49, 40, 32, 0.08)',
   },
   section: {
     display: 'flex',
     flexDirection: 'column',
     gap: '14px',
     padding: '18px',
-    borderRadius: '24px',
-    background: 'linear-gradient(180deg, rgba(255,249,239,0.58), rgba(251,240,222,0.78))',
-    border: '1px solid rgba(73, 55, 37, 0.08)',
-    boxShadow: '0 18px 44px rgba(35, 27, 20, 0.08)',
+    borderRadius: '26px',
+    background: 'linear-gradient(180deg, rgba(255,250,245,0.7), rgba(249,244,236,0.88))',
+    border: '1px solid rgba(122, 96, 81, 0.08)',
+    boxShadow: '0 16px 36px rgba(49, 40, 32, 0.08)',
   },
   sectionHeading: {
     display: 'flex',
@@ -316,7 +318,7 @@ const styles: Record<string, DesktopStyle> = {
     gap: '12px',
     alignItems: 'center',
     padding: '15px',
-    borderRadius: '20px',
+    borderRadius: '24px',
     cursor: 'pointer',
     transition: 'transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease',
     WebkitAppRegion: 'no-drag' as unknown as string,
@@ -536,7 +538,7 @@ export function MainPanel() {
     <div style={styles.container}>
       <div style={styles.titleBar}>
         <div style={styles.titleGroup}>
-          <span style={styles.eyebrow}>Writing Desk</span>
+          <span style={styles.eyebrow}>Desk Companion</span>
           <span style={styles.title}>桌面助手</span>
           <span style={styles.subtitle}>把便签、日历和临时灵感收进一张安静的书桌里，打开时像翻开今天的手帐。</span>
         </div>
@@ -605,7 +607,7 @@ export function MainPanel() {
           </div>
 
           <div style={styles.heroAside}>
-            <span style={styles.heroAsideLabel}>Open pages</span>
+            <span style={styles.heroAsideLabel}>Tiny desk stack</span>
             <span style={styles.heroAsideValue}>{notes.length}</span>
             <span style={styles.heroAsideText}>像书页一样把事项摊开：今天写下的句子、待办和灵感，都能在桌面上停得住，也翻得动。</span>
           </div>
@@ -624,8 +626,8 @@ export function MainPanel() {
             <div
               style={{
                 ...styles.actionCard,
-                background: 'linear-gradient(155deg, #ef7f52 0%, #d85c3a 100%)',
-                color: '#fff8f1',
+                background: 'linear-gradient(155deg, #ffb792 0%, #ff8f7d 100%)',
+                color: '#5a2f28',
               }}
               role="button"
               tabIndex={0}
