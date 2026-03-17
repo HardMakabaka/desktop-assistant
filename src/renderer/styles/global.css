@@ -1,18 +1,52 @@
+:root {
+  color-scheme: light;
+  --focus-ring: #d85c3a;
+  --ink: #1c2430;
+  --paper: #fffaf0;
+  --muted-scrollbar: rgba(28, 36, 48, 0.18);
+  --muted-scrollbar-hover: rgba(28, 36, 48, 0.32);
+}
+
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  font-family: 'Avenir Next', 'Trebuchet MS', 'Microsoft YaHei', sans-serif;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   user-select: none;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+textarea,
+input {
+  user-select: text;
+}
+
+textarea::placeholder {
+  color: rgba(28, 36, 48, 0.34);
 }
 
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -20,18 +54,26 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 2px;
+  background: var(--muted-scrollbar);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-scrollbar-hover);
+  background-clip: padding-box;
 }
 
 button {
   cursor: pointer;
   border: none;
   background: none;
-  font-family: inherit;
 }
 
-button:focus-visible {
-  outline: 2px solid #1976d2;
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
