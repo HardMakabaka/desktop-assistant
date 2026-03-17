@@ -97,9 +97,26 @@ function ensureExists(relativePath) {
   }
 }
 
-function ensureAbsoluteLine(docName, text, label, fullPath) {
-  if (!text.includes(`${label} \`${fullPath}\``)) {
-    throw new Error(`${docName} must contain ${label} \`${fullPath}\``);
+function getMarkdownCodeValue(docName, text, label) {
+  const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`^${escapedLabel}\\s*` + '`([^\\r\\n]+)`$' , 'm');
+  const match = text.match(pattern);
+  if (!match) {
+    throw new Error(`${docName} must contain ${label} followed by a code path`);
+  }
+  return match[1];
+}
+
+function joinDocPath(basePath, ...segments) {
+  const useWindows = /^[A-Za-z]:\\/.test(basePath) || basePath.includes('\\');
+  const pathImpl = useWindows ? path.win32 : path.posix;
+  return pathImpl.join(basePath, ...segments);
+}
+
+function ensureDocumentPath(docName, text, label, expectedPath) {
+  const actualPath = getMarkdownCodeValue(docName, text, label);
+  if (actualPath !== expectedPath) {
+    throw new Error(`${docName} must contain ${label} \`${expectedPath}\``);
   }
 }
 
@@ -132,15 +149,15 @@ for (const projectPath of expectedProjectPaths) {
 ensureMarkdownMentions('PROJECT_INDEX.md', projectIndex, ['Base branch: `main`', 'Release tags use the `v` prefix']);
 ensureMarkdownMentions('CI_CD_POLICY.md', ciPolicy, ['Base branch: `main`', 'Release tags must match `v*`']);
 
-ensureAbsoluteLine('ENV_INDEX.md', envIndex, '- Repo root:', root);
-ensureAbsoluteLine('ENV_INDEX.md', envIndex, '- Source root:', path.join(root, 'src'));
-ensureAbsoluteLine('ENV_INDEX.md', envIndex, '- Automation root:', path.join(root, '.openclaw'));
-ensureAbsoluteLine('ENV_INDEX.md', envIndex, '- Main process entry source:', path.join(root, 'src', 'main', 'main.ts'));
-ensureAbsoluteLine('ENV_INDEX.md', envIndex, '- Preload entry source:', path.join(root, 'src', 'main', 'preload.ts'));
-ensureAbsoluteLine('ENV_INDEX.md', envIndex, '- Renderer root:', path.join(root, 'src', 'renderer'));
-ensureAbsoluteLine('ENV_INDEX.md', envIndex, '- Build output:', path.join(root, 'dist'));
-ensureAbsoluteLine('ENV_INDEX.md', envIndex, '- Release output:', path.join(root, 'release'));
-ensureAbsoluteLine('ENV_INDEX.md', envIndex, '- Workflow directory:', path.join(root, '.github', 'workflows'));
+const documentedRepoRoot = getMarkdownCodeValue('ENV_INDEX.md', envIndex, '- Repo root:');
+ensureDocumentPath('ENV_INDEX.md', envIndex, '- Source root:', joinDocPath(documentedRepoRoot, 'src'));
+ensureDocumentPath('ENV_INDEX.md', envIndex, '- Automation root:', joinDocPath(documentedRepoRoot, '.openclaw'));
+ensureDocumentPath('ENV_INDEX.md', envIndex, '- Main process entry source:', joinDocPath(documentedRepoRoot, 'src', 'main', 'main.ts'));
+ensureDocumentPath('ENV_INDEX.md', envIndex, '- Preload entry source:', joinDocPath(documentedRepoRoot, 'src', 'main', 'preload.ts'));
+ensureDocumentPath('ENV_INDEX.md', envIndex, '- Renderer root:', joinDocPath(documentedRepoRoot, 'src', 'renderer'));
+ensureDocumentPath('ENV_INDEX.md', envIndex, '- Build output:', joinDocPath(documentedRepoRoot, 'dist'));
+ensureDocumentPath('ENV_INDEX.md', envIndex, '- Release output:', joinDocPath(documentedRepoRoot, 'release'));
+ensureDocumentPath('ENV_INDEX.md', envIndex, '- Workflow directory:', joinDocPath(documentedRepoRoot, '.github', 'workflows'));
 ensureMarkdownMentions('ENV_INDEX.md', envIndex, ['- CI OS: `ubuntu-latest`, `windows-latest`', '- Node version in CI: `24`', '- Release trigger: git tag matching `v*`']);
 
 const ciWorkflow = ensureWorkflowContains('ci.yml', [
