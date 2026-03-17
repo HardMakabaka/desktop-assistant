@@ -315,54 +315,27 @@ const styles = {
     boxShadow: '0 18px 54px rgba(29, 23, 17, 0.18)',
   },
   header: {
-    display: 'grid',
-    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+    display: 'flex',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: '8px',
-    padding: '8px 10px',
+    padding: '6px 10px',
     WebkitAppRegion: 'drag' as unknown as string,
-    minHeight: '48px',
+    minHeight: '40px',
     borderBottom: '1px solid rgba(73, 55, 37, 0.08)',
     backdropFilter: 'blur(14px)',
   },
   headerActions: {
     display: 'flex',
     gap: '5px',
+    flexWrap: 'wrap' as const,
     WebkitAppRegion: 'no-drag' as unknown as string,
   },
-  headerMeta: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 0,
-    gap: '2px',
-    textAlign: 'center' as const,
-    color: 'rgba(46, 35, 24, 0.8)',
-  },
-  headerEyebrow: {
-    fontSize: '10px',
-    letterSpacing: '0.16em',
-    textTransform: 'uppercase' as const,
-    color: 'rgba(65, 50, 37, 0.52)',
-    fontWeight: 700,
-  },
-  headerTitle: {
-    fontSize: '17px',
-    lineHeight: 1.1,
-    fontWeight: 700,
-    fontFamily: SERIF_STACK,
-    letterSpacing: '-0.03em',
-    color: '#31271d',
-  },
-  headerSubtitle: {
-    fontSize: '11px',
-    color: 'rgba(65, 50, 37, 0.64)',
-  },
   iconBtn: {
-    minWidth: 26,
-    height: 26,
-    borderRadius: '10px',
+    minWidth: 24,
+    height: 24,
+    padding: '0 8px',
+    borderRadius: '9px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -821,7 +794,6 @@ export function NoteWindow() {
   const noteOpacity = note.opacity ?? 100;
   const bgRgba = hexToRgba(note.color, noteOpacity);
   const headerBg = darkenColor(note.color, 15);
-  const noteModeLabel = livePreviewEnabled ? '所见即所得' : '源码书写';
 
   return (
     <div style={{ ...styles.container, background: bgRgba }}>
@@ -921,11 +893,6 @@ export function NoteWindow() {
           >
             🎨
           </button>
-        </div>
-        <div style={styles.headerMeta}>
-          <span style={styles.headerEyebrow}>Paper Note</span>
-          <span style={styles.headerTitle}>桌面便签</span>
-          <span style={styles.headerSubtitle}>{noteModeLabel} · {noteFontSize}px</span>
         </div>
         <div style={styles.headerActions}>
           <button
