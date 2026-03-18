@@ -5,17 +5,27 @@
 - Task: TASK-13
 - Repo: desktop-assistant
 - Report status: In progress
-- Updated (UTC): 2026-03-07T04:28:39Z
-- Commit: 23026dd
+- Updated (UTC): 2026-03-08T00:30:26Z
+- Commit: 4606b6b
 - Environment: Linux (Ubuntu) x64
+
+## Evidence
+
+- Local: `npm run verify` passed on Linux (Ubuntu) (2026-03-08T00:30:26Z)
+- CI: https://github.com/HardMakabaka/desktop-assistant/actions/runs/22806546617 (success)
+  - Jobs: `verify (ubuntu-latest)`, `verify (windows-latest)`
+
+## Constraints
+
+- Manual functional QA (B~G) is pending: this run has no Windows environment and no interactive desktop session for end-to-end UI verification.
 
 ## A. Build Verification
 
 - [x] `npm run typecheck` (0 errors) (Linux)
 - [x] `npm run build` (Linux)
-- [ ] `npm run pack` (Windows) -> `.exe` produced
+- [x] `npm run pack` (Windows) -> `.exe` produced (validated in CI)
 - [x] `npm run pack:linux` (Linux) -> `.deb` produced (`release/桌面助手-1.0.4-linux-amd64.deb`)
-- [ ] GitHub Actions CI green on `ubuntu-latest` and `windows-latest`
+- [x] GitHub Actions CI green on `ubuntu-latest` and `windows-latest`
 
 ## B. Notes Core
 
@@ -71,3 +81,4 @@
 ## Bugs Found / Follow-ups
 
 - None yet.
+- Follow-up: run the B~G checklists on real Windows + Ubuntu desktops and mark results here.

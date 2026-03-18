@@ -4,7 +4,7 @@ title: EPIC 第二轮体验优化与发版（OCR/WYSIWYG/主题/清理/架构图
 status: To Do
 assignee: []
 created_date: '2026-03-06 18:56'
-updated_date: '2026-03-06 18:56'
+updated_date: '2026-03-08 04:59'
 labels:
   - epic
   - ux
@@ -37,6 +37,7 @@ references:
 - TASK-10 日历/便签背景颜色与透明度调节
 - TASK-11 便签去除"移入垃圾桶"按钮
 - TASK-12 补充 Mermaid 架构图
+- TASK-15 Playwright Electron 自动化测试拆解
 - TASK-13 Linux + Windows 跨平台全面测试
 - TASK-14 自动发版
 

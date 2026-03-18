@@ -4,7 +4,7 @@ title: Linux + Windows 跨平台全面测试
 status: In Progress
 assignee: []
 created_date: '2026-03-06 18:56'
-updated_date: '2026-03-07 04:28'
+updated_date: '2026-03-08 04:59'
 labels:
   - testing
   - linux
@@ -17,6 +17,7 @@ dependencies:
   - TASK-10
   - TASK-11
   - TASK-12
+  - TASK-15
 references:
   - package.json
   - .github/workflows/ci.yml
@@ -84,12 +85,14 @@ references:
 ## Progress
 
 - 测试报告已创建：`backlog/docs/TASK-13-test-report.md`
+- 测试报告已更新：补充本次自动化验证通过与手动测试待完成说明（仍需在真实 Windows/Ubuntu 桌面环境回归 B~G）
 - CI 已补齐 Windows 覆盖：`.github/workflows/ci.yml`（`ubuntu-latest` + `windows-latest`）
+- CI 已验证通过（ubuntu-latest + windows-latest）：https://github.com/HardMakabaka/desktop-assistant/actions/runs/22806546617
 - Linux GUI 测试方案已补充：`backlog/docs/linux-gui-test-plan.md`
 
 ## Acceptance Criteria
 - [ ] #1 Windows 上所有功能点通过测试
 - [ ] #2 Linux 上所有功能点通过测试（或有明确降级说明）
-- [ ] #3 CI 全绿
-- [ ] #4 输出测试报告
+- [x] #3 CI 全绿
+- [x] #4 输出测试报告
 - [ ] #5 所有发现的 bug 已修复并回归通过
