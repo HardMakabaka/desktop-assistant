@@ -55,6 +55,32 @@ async function wheelScroll(page, selector, deltaY = 1200) {
   await page.waitForTimeout(250);
 }
 
+async function ensureSourceMode(page) {
+  const sourceEditor = page.locator('.cm-editor');
+  if (await sourceEditor.isVisible().catch(() => false)) {
+    return sourceEditor;
+  }
+
+  const switchButton = page.getByRole('button', { name: '切换到源码模式' });
+  await switchButton.waitFor({ state: 'visible' });
+  await switchButton.click();
+  await sourceEditor.waitFor({ state: 'visible' });
+  return sourceEditor;
+}
+
+async function ensureRichMode(page) {
+  const richEditor = page.locator('.mdxeditor-root-contenteditable');
+  if (await richEditor.isVisible().catch(() => false)) {
+    return richEditor;
+  }
+
+  const switchButton = page.getByRole('button', { name: '切换到所见即所得' });
+  await switchButton.waitFor({ state: 'visible' });
+  await switchButton.click();
+  await richEditor.waitFor({ state: 'visible' });
+  return richEditor;
+}
+
 async function main() {
   const appDataRoot = await mkdtemp(path.join(os.tmpdir(), 'desktop-assistant-e2e-'));
   let electronApp;
@@ -85,7 +111,8 @@ async function main() {
     });
 
     await noteWindow.bringToFront();
-    await noteWindow.locator('.cm-editor').waitFor({ state: 'visible' });
+    await noteWindow.getByRole('button', { name: 'OCR 截图识别文字' }).waitFor({ state: 'visible' });
+    await ensureSourceMode(noteWindow);
 
     const longText = Array.from({ length: 160 }, (_, index) => `- scroll test line ${index + 1} lorem ipsum dolor sit amet`).join('\n');
 

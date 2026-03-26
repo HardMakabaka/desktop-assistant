@@ -1,6 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createWorker, type Worker } from 'tesseract.js';
+import { createWorker } from 'tesseract.js';
 import type { OcrResultPayload } from '../../shared/types';
+
+interface OcrWorkerLike {
+  recognize(input: HTMLCanvasElement): Promise<{ data?: { text?: string } }>;
+  terminate(): Promise<unknown>;
+}
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -32,6 +37,14 @@ function markLangCached(): void {
   try {
     window.localStorage.setItem(LANG_DOWNLOADED_KEY, '1');
   } catch { /* */ }
+}
+
+function getTesseractAssetURL(fileName: string): string {
+  return new URL(`./tesseract/${fileName}`, window.location.href).toString();
+}
+
+function getTesseractCorePath(): string {
+  return new URL('./tesseract/', window.location.href).toString();
 }
 
 const styles = {
@@ -192,9 +205,12 @@ function friendlyError(err: unknown, context: string): string {
 }
 
 export function OcrCaptureWindow() {
-  const noteId = useMemo(() => new URLSearchParams(window.location.search).get('noteId') || '', []);
+  const searchParams = useMemo(() => new URLSearchParams(window.location.search), []);
+  const noteId = useMemo(() => searchParams.get('noteId') || '', [searchParams]);
+  const isE2E = useMemo(() => searchParams.get('e2e') === '1', [searchParams]);
+  const e2eOcrText = useMemo(() => searchParams.get('ocrText') || 'Mock OCR text', [searchParams]);
   const imgRef = useRef<HTMLImageElement>(null);
-  const workerRef = useRef<Worker | null>(null);
+  const workerRef = useRef<OcrWorkerLike | null>(null);
   const dragRef = useRef<{ active: boolean; ax: number; ay: number }>({ active: false, ax: 0, ay: 0 });
 
   const [phase, setPhase] = useState<OcrPhase>('init');
@@ -234,12 +250,12 @@ export function OcrCaptureWindow() {
   }, [closeWithResult, noteId]);
 
   // ---- Worker initialization with download confirmation ----
-  const initWorker = useCallback(async (): Promise<Worker> => {
+  const initWorker = useCallback(async (): Promise<OcrWorkerLike> => {
     if (workerRef.current) return workerRef.current;
 
     const worker = await createWorker(['chi_sim'], 1, {
-      workerPath: 'https://cdn.jsdelivr.net/npm/tesseract.js@v5.0.0/dist/worker.min.js',
-      corePath: 'https://cdn.jsdelivr.net/npm/tesseract.js-core@v5.0.0',
+      workerPath: getTesseractAssetURL('worker.min.js'),
+      corePath: getTesseractCorePath(),
       langPath: 'https://tessdata.projectnaptha.com/4.0.0',
       logger: (m: { status?: string; progress?: number }) => {
         if (typeof m.progress === 'number') {
@@ -285,8 +301,38 @@ export function OcrCaptureWindow() {
   // ---- Screenshot ----
   const takeScreenshot = useCallback(async () => {
     cleanupScreenshot();
-    setHint('正在请求屏幕权限...');
 
+    if (isE2E) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1400;
+      canvas.height = 420;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setError('?????????');
+        return;
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#111111';
+      ctx.font = 'bold 120px "Microsoft YaHei", "PingFang SC", sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(e2eOcrText, 80, canvas.height / 2);
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(b => (b ? resolve(b) : reject(new Error('??????'))), 'image/png');
+      });
+      const url = URL.createObjectURL(blob);
+      setScreenshotURL(url);
+      setScreenshotReady(true);
+      setSelection({ x: 120, y: 120, w: 360, h: 140 });
+      setHint('拖拽框选要识别的区域（Esc 取消）');
+      setError('');
+      setPhase('selecting');
+      return;
+    }
+
+    setHint('????????...');
     if (!navigator.mediaDevices?.getDisplayMedia) {
       setError('当前系统不支持屏幕截图。如果使用 Wayland 桌面，请尝试切换到 X11 桌面环境，或确认已安装 PipeWire + xdg-desktop-portal。');
       setHint('');
@@ -347,14 +393,14 @@ export function OcrCaptureWindow() {
   // ---- Phase transitions ----
   useEffect(() => {
     if (phase === 'init') {
-      if (isLangCached()) {
+      if (isE2E || isLangCached()) {
         // Language data previously downloaded, skip confirmation
         setPhase('ready');
       } else {
         setPhase('download-confirm');
       }
     }
-  }, [phase]);
+  }, [isE2E, phase]);
 
   useEffect(() => {
     if (phase === 'ready') {
@@ -477,6 +523,18 @@ export function OcrCaptureWindow() {
       if (timeoutId) clearTimeout(timeoutId);
     }
   }, [busy, closeWithResult, initWorker, mapViewportRectToImageRect, noteId, selection]);
+
+  useEffect(() => {
+    if (!isE2E || phase !== 'selecting' || !noteId) return;
+
+    const timer = window.setTimeout(() => {
+      void closeWithResult({ noteId, ok: true, text: e2eOcrText.trim() || 'Mock OCR text' }).then(() => {
+        void window.desktopAPI.closeWindow();
+      });
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [closeWithResult, e2eOcrText, isE2E, noteId, phase]);
 
   // ---- Retry handler ----
   const handleRetry = useCallback(() => {

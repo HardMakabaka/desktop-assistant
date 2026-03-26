@@ -511,9 +511,14 @@ export function NoteWindow() {
     if (!note) return;
 
     requestAnimationFrame(() => {
-      mdxEditorRef.current?.setMarkdown(note.content || '');
+      const editor = mdxEditorRef.current;
+      if (!editor) return;
+      const nextMarkdown = note.content || '';
+      const currentMarkdown = editor.getMarkdown?.();
+      if (typeof currentMarkdown === 'string' && currentMarkdown === nextMarkdown) return;
+      editor.setMarkdown(nextMarkdown);
     });
-  }, [note?.id]);
+  }, [livePreviewEnabled, note?.content, note?.id]);
 
   useEffect(() => {
     if (!recordingAction) return;
@@ -579,7 +584,25 @@ export function NoteWindow() {
       const insertion = `${needsLeadingNewline ? '\n' : ''}${text}\n`;
 
       if (editor && typeof editor.insertMarkdown === 'function') {
-        editor.insertMarkdown(insertion);
+        if (typeof editor.focus === 'function') {
+          editor.focus(() => editor.insertMarkdown(insertion), {
+            defaultSelection: 'rootEnd',
+            preventScroll: true,
+          });
+        } else {
+          editor.insertMarkdown(insertion);
+        }
+
+        setTimeout(() => {
+          const nextMarkdown = editor.getMarkdown?.();
+          if (typeof nextMarkdown === 'string' && nextMarkdown !== md) {
+            handleContentChange(nextMarkdown);
+            return;
+          }
+
+          // Some rich-text states expose insertMarkdown but ignore it without an active caret.
+          handleContentChange(md + insertion);
+        }, 0);
         return;
       }
 
@@ -705,8 +728,12 @@ export function NoteWindow() {
   };
 
   const toggleEditorMode = useCallback(() => {
+    const latestMarkdown = mdxEditorRef.current?.getMarkdown?.();
+    if (typeof latestMarkdown === 'string' && latestMarkdown !== (noteRef.current?.content || '')) {
+      handleContentChange(latestMarkdown);
+    }
     setLivePreviewEnabled(v => !v);
-  }, []);
+  }, [handleContentChange]);
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!note) return;
