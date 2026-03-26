@@ -12,7 +12,11 @@ export class StoreManager {
   private store: Store<StoreSchema>;
 
   constructor() {
+    const isE2E = process.env.DESKTOP_ASSISTANT_E2E === '1';
+
     this.store = new Store<StoreSchema>({
+      name: isE2E ? 'desktop-assistant-e2e' : undefined,
+      cwd: isE2E ? process.env.DESKTOP_ASSISTANT_E2E_DATA_DIR : undefined,
       defaults: {
         notes: [],
         marks: [],

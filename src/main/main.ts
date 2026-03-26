@@ -255,6 +255,10 @@ function createOcrWindow(noteId: string): void {
 
   const ocrURL = new URL(getRendererURL('ocr'));
   ocrURL.searchParams.set('noteId', noteId);
+  if (process.env.DESKTOP_ASSISTANT_E2E === '1') {
+    ocrURL.searchParams.set('e2e', '1');
+    ocrURL.searchParams.set('ocrText', process.env.DESKTOP_ASSISTANT_E2E_OCR_TEXT || 'Mock OCR text');
+  }
   ocrWindow.loadURL(ocrURL.toString());
   verifyBridge(ocrWindow, 'ocr-window');
 
