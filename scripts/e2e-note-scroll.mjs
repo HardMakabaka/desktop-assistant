@@ -68,17 +68,17 @@ async function ensureSourceMode(page) {
   return sourceEditor;
 }
 
-async function ensurePreviewMode(page) {
-  const preview = page.locator('.note-markdown-preview');
-  if (await preview.isVisible().catch(() => false)) {
-    return preview;
+async function ensureRichMode(page) {
+  const richEditor = page.locator('.mdxeditor-root-contenteditable');
+  if (await richEditor.isVisible().catch(() => false)) {
+    return richEditor;
   }
 
-  const switchButton = page.getByRole('button', { name: '切换到预览模式' });
+  const switchButton = page.getByRole('button', { name: '切换到所见即所得' });
   await switchButton.waitFor({ state: 'visible' });
   await switchButton.click();
-  await preview.waitFor({ state: 'visible' });
-  return preview;
+  await richEditor.waitFor({ state: 'visible' });
+  return richEditor;
 }
 
 async function main() {
@@ -128,23 +128,23 @@ async function main() {
     const sourceAfter = await getScrollMetrics(noteWindow, '.note-source-textarea');
     assert(sourceAfter.scrollTop > sourceBefore.scrollTop + 100, 'Mouse wheel should scroll in source mode');
 
-    await ensurePreviewMode(noteWindow);
+    await ensureRichMode(noteWindow);
     await noteWindow.waitForTimeout(400);
 
-    await setScrollTop(noteWindow, '.note-markdown-preview', 0);
-    const previewBefore = await getScrollMetrics(noteWindow, '.note-markdown-preview');
-    assert(previewBefore.scrollHeight > previewBefore.clientHeight, 'Preview mode should overflow vertically');
+    await setScrollTop(noteWindow, '.mdxeditor-root-contenteditable', 0);
+    const richBefore = await getScrollMetrics(noteWindow, '.mdxeditor-root-contenteditable');
+    assert(richBefore.scrollHeight > richBefore.clientHeight, 'Rich text mode should overflow vertically');
 
-    await wheelScroll(noteWindow, '.note-markdown-preview');
-    const previewAfter = await getScrollMetrics(noteWindow, '.note-markdown-preview');
-    assert(previewAfter.scrollTop > previewBefore.scrollTop + 100, 'Mouse wheel should scroll in preview mode');
+    await wheelScroll(noteWindow, '.mdxeditor-root-contenteditable');
+    const richAfter = await getScrollMetrics(noteWindow, '.mdxeditor-root-contenteditable');
+    assert(richAfter.scrollTop > richBefore.scrollTop + 100, 'Mouse wheel should scroll in rich text mode');
 
     console.log(
       JSON.stringify(
         {
           ok: true,
           sourceMode: sourceAfter,
-          previewMode: previewAfter,
+          richTextMode: richAfter,
         },
         null,
         2,

@@ -49,8 +49,8 @@ async function getMarkdown(page) {
     if (source instanceof HTMLTextAreaElement) {
       return source.value || '';
     }
-    const preview = document.querySelector('.note-markdown-preview');
-    return preview?.textContent || '';
+    const rich = document.querySelector('.mdxeditor-root-contenteditable');
+    return rich?.textContent || '';
   });
 }
 
@@ -67,17 +67,17 @@ async function ensureSourceMode(page) {
   return sourceEditor;
 }
 
-async function ensurePreviewMode(page) {
-  const preview = page.locator('.note-markdown-preview');
-  if (await preview.isVisible().catch(() => false)) {
-    return preview;
+async function ensureRichMode(page) {
+  const richEditor = page.locator('.mdxeditor-root-contenteditable');
+  if (await richEditor.isVisible().catch(() => false)) {
+    return richEditor;
   }
 
-  const switchButton = page.getByRole('button', { name: '切换到预览模式' });
+  const switchButton = page.getByRole('button', { name: '切换到所见即所得' });
   await switchButton.waitFor({ state: 'visible' });
   await switchButton.click();
-  await preview.waitFor({ state: 'visible' });
-  return preview;
+  await richEditor.waitFor({ state: 'visible' });
+  return richEditor;
 }
 
 async function main() {
@@ -117,9 +117,9 @@ async function main() {
     await noteWindow.keyboard.insertText('# Sync heading\nsource side text');
     await noteWindow.waitForTimeout(500);
 
-    const preview = await ensurePreviewMode(noteWindow);
-    await expectText(preview, 'Sync heading');
-    await expectText(preview, 'source side text');
+    const richEditor = await ensureRichMode(noteWindow);
+    await expectText(richEditor, 'Sync heading');
+    await expectText(richEditor, 'source side text');
 
     await noteWindow.getByRole('button', { name: 'OCR 截图识别文字' }).click();
 
@@ -143,9 +143,9 @@ async function main() {
     }
 
     await noteWindow.bringToFront();
-    await preview.waitFor({ state: 'visible' });
+    await richEditor.waitFor({ state: 'visible' });
     await noteWindow.getByText('OCR 识别结果已插入').waitFor({ state: 'visible' });
-    await expectText(preview, 'OCR inserted line');
+    await expectText(richEditor, 'OCR inserted line');
 
     await ensureSourceMode(noteWindow);
     const sourceEditor = noteWindow.locator('.note-source-textarea');

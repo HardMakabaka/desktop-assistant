@@ -41,17 +41,17 @@ async function ensureSourceMode(page) {
   return sourceEditor;
 }
 
-async function ensurePreviewMode(page) {
-  const preview = page.locator('.note-markdown-preview');
-  if (await preview.isVisible().catch(() => false)) {
-    return preview;
+async function ensureRichMode(page) {
+  const richEditor = page.locator('.mdxeditor-root-contenteditable');
+  if (await richEditor.isVisible().catch(() => false)) {
+    return richEditor;
   }
 
-  const switchButton = page.getByRole('button', { name: '切换到预览模式' });
+  const switchButton = page.getByRole('button', { name: '切换到所见即所得' });
   await switchButton.waitFor({ state: 'visible' });
   await switchButton.click();
-  await preview.waitFor({ state: 'visible' });
-  return preview;
+  await richEditor.waitFor({ state: 'visible' });
+  return richEditor;
 }
 
 async function getCurrentNoteContent(page) {
@@ -66,6 +66,22 @@ async function getScrollTop(page, selector) {
   return page.locator(selector).evaluate(node => node.scrollTop);
 }
 
+async function clickRichTextEnd(page) {
+  const root = page.locator('.mdxeditor-root-contenteditable');
+  await root.evaluate(node => {
+    node.scrollTop = node.scrollHeight;
+  });
+
+  const lastLine = page.locator('.mdxeditor-root-contenteditable li, .mdxeditor-root-contenteditable p').last();
+  await lastLine.scrollIntoViewIfNeeded();
+  const box = await lastLine.boundingBox();
+  if (!box) {
+    throw new Error('No rich text line found to place caret');
+  }
+
+  await page.mouse.move(box.x + Math.max(6, box.width - 10), box.y + box.height / 2);
+  await page.mouse.click(box.x + Math.max(6, box.width - 10), box.y + box.height / 2);
+}
 
 async function main() {
   const appDataRoot = await mkdtemp(path.join(os.tmpdir(), 'desktop-assistant-e2e-'));
@@ -100,6 +116,7 @@ async function main() {
     await noteWindow.getByRole('button', { name: 'OCR 截图识别文字' }).waitFor({ state: 'visible' });
 
     const sourceTail = ' [source-tail-check]';
+    const richTail = ' [rich-tail-check]';
     const longText = Array.from({ length: 160 }, (_, index) => `- caret test line ${index + 1} lorem ipsum dolor sit amet`).join('\n');
 
     await ensureSourceMode(noteWindow);
@@ -120,14 +137,26 @@ async function main() {
     assert(sourceScrollBefore > 100, 'Source mode should be scrolled away from the top before typing');
     assert(sourceScrollAfter > 100, 'Source mode typing should not jump back to the top');
 
-    await ensurePreviewMode(noteWindow);
+    await ensureRichMode(noteWindow);
     await noteWindow.waitForTimeout(500);
-    const previewHtml = await noteWindow.locator('.note-markdown-preview').innerHTML();
-    assert(previewHtml.includes('source-tail-check'), 'Preview mode should render the latest markdown content');
+    await clickRichTextEnd(noteWindow);
+    const richScrollBefore = await getScrollTop(noteWindow, '.mdxeditor-root-contenteditable');
+    await noteWindow.keyboard.type(richTail, { delay: 60 });
+    await noteWindow.waitForTimeout(700);
+    const richScrollAfter = await getScrollTop(noteWindow, '.mdxeditor-root-contenteditable');
+    const richContent = await getCurrentNoteContent(noteWindow);
+
+    assert(richContent && richContent.includes('caret test line 160'), 'Rich text mode should keep the existing long-form content');
+    assert(richContent && richContent.includes('source-tail-check'), 'Rich text mode should preserve the source-mode append');
+    assert(richContent && richContent.includes('rich-tail-check'), 'Rich text mode should append newly typed content');
+    assert(richScrollBefore > 100, 'Rich text mode should be scrolled away from the top before typing');
+    assert(richScrollAfter > 100, 'Rich text typing should not jump back to the top');
 
     await ensureSourceMode(noteWindow);
-    const sourceValueAfterPreview = await noteWindow.locator('.note-source-textarea').inputValue();
-    assert.equal(sourceValueAfterPreview, `${longText}${sourceTail}`);
+    const sourceValueAfterRichEdit = await noteWindow.locator('.note-source-textarea').inputValue();
+    assert(sourceValueAfterRichEdit.includes('caret test line 160'), 'Source mode should still show the original note body after rich editing');
+    assert(sourceValueAfterRichEdit.includes('source-tail-check'), 'Source mode should keep the source append after returning from rich mode');
+    assert(sourceValueAfterRichEdit.includes('rich-tail-check'), 'Source mode should show content entered in rich mode');
 
     console.log(
       JSON.stringify(
@@ -135,6 +164,8 @@ async function main() {
           ok: true,
           sourceScrollBefore,
           sourceScrollAfter,
+          richScrollBefore,
+          richScrollAfter,
         },
         null,
         2,

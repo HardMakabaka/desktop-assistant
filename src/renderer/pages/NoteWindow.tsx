@@ -1,4 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import {
+  MDXEditor,
+  type MDXEditorMethods,
+  headingsPlugin,
+  listsPlugin,
+  quotePlugin,
+  thematicBreakPlugin,
+  markdownShortcutPlugin,
+} from '@mdxeditor/editor';
 import type { StickyNote } from '../../shared/types';
 import { ColorOpacityPicker, hexToRgba } from './ColorOpacityPicker';
 
@@ -457,8 +466,12 @@ export function NoteWindow() {
   const [recordingAction, setRecordingAction] = useState<NoteShortcutAction | null>(null);
   const [recordingHint, setRecordingHint] = useState('');
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+  const [richEditorKey, setRichEditorKey] = useState(0);
+  const [richEditorInitialMarkdown, setRichEditorInitialMarkdown] = useState('');
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const sourceTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const mdxEditorRef = useRef<MDXEditorMethods>(null);
+  const suppressRichChangeRef = useRef(false);
 
   // 从 URL 获取便签 ID
   const noteId = new URLSearchParams(window.location.search).get('id');
@@ -468,6 +481,7 @@ export function NoteWindow() {
     const notes = await window.desktopAPI.getNotes();
     const found = notes.find(n => n.id === noteId);
     if (found) {
+      setRichEditorInitialMarkdown(found.content || '');
       setNote(found);
       setPinned(found.pinned);
     }
@@ -480,6 +494,11 @@ export function NoteWindow() {
   useEffect(() => {
     noteRef.current = note;
   }, [note]);
+
+  useEffect(() => {
+    if (!note) return;
+    setRichEditorInitialMarkdown(note.content || '');
+  }, [note?.id]);
 
   useEffect(() => {
     try {
@@ -496,6 +515,43 @@ export function NoteWindow() {
       console.warn('[note-window] failed to persist font size preference', error);
     }
   }, [noteFontSize]);
+
+  useEffect(() => {
+    if (!livePreviewEnabled) return;
+
+    let cancelled = false;
+    const nextMarkdown = richEditorInitialMarkdown;
+    suppressRichChangeRef.current = true;
+
+    const syncEditor = () => {
+      if (cancelled) return;
+
+      const editor = mdxEditorRef.current;
+      if (!editor) {
+        requestAnimationFrame(syncEditor);
+        return;
+      }
+
+      const currentMarkdown = editor.getMarkdown?.();
+      if (typeof currentMarkdown === 'string' && currentMarkdown === nextMarkdown) {
+        requestAnimationFrame(() => {
+          if (!cancelled) suppressRichChangeRef.current = false;
+        });
+        return;
+      }
+
+      editor.setMarkdown(nextMarkdown);
+      requestAnimationFrame(() => {
+        if (!cancelled) suppressRichChangeRef.current = false;
+      });
+    };
+
+    requestAnimationFrame(syncEditor);
+    return () => {
+      cancelled = true;
+      suppressRichChangeRef.current = false;
+    };
+  }, [livePreviewEnabled, richEditorInitialMarkdown, richEditorKey]);
 
   useEffect(() => {
     if (!recordingAction) return;
@@ -551,6 +607,22 @@ export function NoteWindow() {
     }, 300);
   }, []);
 
+  const handleRichContentChange = useCallback(
+    (content: string, initialMarkdownNormalize: boolean) => {
+      const current = noteRef.current;
+      if (!current) return;
+      if (suppressRichChangeRef.current) return;
+
+      // MDXEditor may emit bootstrap normalization changes while hydrating from markdown.
+      if (initialMarkdownNormalize && (!content || content.trim() === current.content.trim())) {
+        return;
+      }
+
+      handleContentChange(content);
+    },
+    [handleContentChange],
+  );
+
   const insertTextAtCursor = useCallback(
     (text: string) => {
       const current = noteRef.current;
@@ -560,22 +632,47 @@ export function NoteWindow() {
       const needsLeadingNewline = base.length > 0 && !base.endsWith('\n');
       const insertion = `${needsLeadingNewline ? '\n' : ''}${text}\n`;
 
-      if (!livePreviewEnabled) {
-        const textarea = sourceTextareaRef.current;
-        if (textarea) {
-          const selectionStart = textarea.selectionStart ?? base.length;
-          const selectionEnd = textarea.selectionEnd ?? selectionStart;
-          const nextContent = `${base.slice(0, selectionStart)}${insertion}${base.slice(selectionEnd)}`;
-          handleContentChange(nextContent);
+      if (livePreviewEnabled) {
+        const editor = mdxEditorRef.current;
+        if (editor && typeof editor.insertMarkdown === 'function') {
+          suppressRichChangeRef.current = true;
+          if (typeof editor.focus === 'function') {
+            editor.focus(() => editor.insertMarkdown(insertion), {
+              defaultSelection: 'rootEnd',
+              preventScroll: true,
+            });
+          } else {
+            editor.insertMarkdown(insertion);
+          }
 
-          const nextCaret = selectionStart + insertion.length;
-          requestAnimationFrame(() => {
-            textarea.focus();
-            textarea.selectionStart = nextCaret;
-            textarea.selectionEnd = nextCaret;
-          });
+          setTimeout(() => {
+            const nextMarkdown = editor.getMarkdown?.();
+            suppressRichChangeRef.current = false;
+            if (typeof nextMarkdown === 'string' && nextMarkdown !== base) {
+              handleContentChange(nextMarkdown);
+              return;
+            }
+
+            handleContentChange(base + insertion);
+          }, 0);
           return;
         }
+      }
+
+      const textarea = sourceTextareaRef.current;
+      if (textarea) {
+        const selectionStart = textarea.selectionStart ?? base.length;
+        const selectionEnd = textarea.selectionEnd ?? selectionStart;
+        const nextContent = `${base.slice(0, selectionStart)}${insertion}${base.slice(selectionEnd)}`;
+        handleContentChange(nextContent);
+
+        const nextCaret = selectionStart + insertion.length;
+        requestAnimationFrame(() => {
+          textarea.focus();
+          textarea.selectionStart = nextCaret;
+          textarea.selectionEnd = nextCaret;
+        });
+        return;
       }
 
       handleContentChange(base + insertion);
@@ -700,8 +797,21 @@ export function NoteWindow() {
   };
 
   const toggleEditorMode = useCallback(() => {
-    setLivePreviewEnabled(v => !v);
-  }, []);
+    const currentMarkdown = noteRef.current?.content ?? '';
+
+    if (livePreviewEnabled) {
+      const latestMarkdown = mdxEditorRef.current?.getMarkdown?.();
+      if (typeof latestMarkdown === 'string' && latestMarkdown !== currentMarkdown) {
+        handleContentChange(latestMarkdown);
+      }
+      setLivePreviewEnabled(false);
+      return;
+    }
+
+    setRichEditorInitialMarkdown(currentMarkdown);
+    setRichEditorKey(v => v + 1);
+    setLivePreviewEnabled(true);
+  }, [handleContentChange, livePreviewEnabled]);
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!note) return;
@@ -817,10 +927,10 @@ export function NoteWindow() {
             onClick={toggleEditorMode}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            title={livePreviewEnabled ? '切换到源码模式' : '切换到预览模式'}
-            aria-label={livePreviewEnabled ? '切换到源码模式' : '切换到预览模式'}
+            title={livePreviewEnabled ? '切换到源码模式' : '切换到所见即所得'}
+            aria-label={livePreviewEnabled ? '切换到源码模式' : '切换到所见即所得'}
           >
-            {livePreviewEnabled ? '源码' : '预览'}
+            {livePreviewEnabled ? '源码' : '所见'}
           </button>
 
           <button
@@ -973,11 +1083,21 @@ export function NoteWindow() {
           `}</style>
 
           {livePreviewEnabled ? (
-            <div
-              className="note-markdown-preview"
-              style={{ ...styles.preview, fontSize: `${noteFontSize}px`, overflowY: 'auto' }}
-              dangerouslySetInnerHTML={{ __html: renderMarkdownToSafeHtml(note.content || '') }}
-              aria-label="便签预览"
+            <MDXEditor
+              key={`rich-${note.id}-${richEditorKey}`}
+              ref={mdxEditorRef}
+              markdown={richEditorInitialMarkdown}
+              onChange={handleRichContentChange}
+              className="note-mdx-editor"
+              contentEditableClassName="note-mdx-prose"
+              readOnly={actionBusy}
+              plugins={[
+                headingsPlugin(),
+                listsPlugin(),
+                quotePlugin(),
+                thematicBreakPlugin(),
+                markdownShortcutPlugin(),
+              ]}
             />
           ) : (
             <textarea
