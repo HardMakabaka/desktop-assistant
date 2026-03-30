@@ -1,14 +1,4 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import {
-  MDXEditor,
-  type MDXEditorMethods,
-  diffSourcePlugin,
-  headingsPlugin,
-  listsPlugin,
-  quotePlugin,
-  thematicBreakPlugin,
-  markdownShortcutPlugin,
-} from '@mdxeditor/editor';
 import type { StickyNote } from '../../shared/types';
 import { ColorOpacityPicker, hexToRgba } from './ColorOpacityPicker';
 
@@ -467,8 +457,8 @@ export function NoteWindow() {
   const [recordingAction, setRecordingAction] = useState<NoteShortcutAction | null>(null);
   const [recordingHint, setRecordingHint] = useState('');
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
-  const mdxEditorRef = useRef<MDXEditorMethods>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const sourceTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   // 从 URL 获取便签 ID
   const noteId = new URLSearchParams(window.location.search).get('id');
@@ -506,19 +496,6 @@ export function NoteWindow() {
       console.warn('[note-window] failed to persist font size preference', error);
     }
   }, [noteFontSize]);
-
-  useEffect(() => {
-    if (!note) return;
-
-    requestAnimationFrame(() => {
-      const editor = mdxEditorRef.current;
-      if (!editor) return;
-      const nextMarkdown = note.content || '';
-      const currentMarkdown = editor.getMarkdown?.();
-      if (typeof currentMarkdown === 'string' && currentMarkdown === nextMarkdown) return;
-      editor.setMarkdown(nextMarkdown);
-    });
-  }, [livePreviewEnabled, note?.content, note?.id]);
 
   useEffect(() => {
     if (!recordingAction) return;
@@ -565,6 +542,7 @@ export function NoteWindow() {
     const current = noteRef.current;
     if (!current) return;
     if (content === current.content) return;
+
     setNote(prev => (prev ? { ...prev, content } : prev));
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -578,37 +556,31 @@ export function NoteWindow() {
       const current = noteRef.current;
       if (!current) return;
 
-      const editor = mdxEditorRef.current;
-      const md = editor?.getMarkdown?.() ?? current.content ?? '';
-      const needsLeadingNewline = md.length > 0 && !md.endsWith('\n');
+      const base = current.content ?? '';
+      const needsLeadingNewline = base.length > 0 && !base.endsWith('\n');
       const insertion = `${needsLeadingNewline ? '\n' : ''}${text}\n`;
 
-      if (editor && typeof editor.insertMarkdown === 'function') {
-        if (typeof editor.focus === 'function') {
-          editor.focus(() => editor.insertMarkdown(insertion), {
-            defaultSelection: 'rootEnd',
-            preventScroll: true,
+      if (!livePreviewEnabled) {
+        const textarea = sourceTextareaRef.current;
+        if (textarea) {
+          const selectionStart = textarea.selectionStart ?? base.length;
+          const selectionEnd = textarea.selectionEnd ?? selectionStart;
+          const nextContent = `${base.slice(0, selectionStart)}${insertion}${base.slice(selectionEnd)}`;
+          handleContentChange(nextContent);
+
+          const nextCaret = selectionStart + insertion.length;
+          requestAnimationFrame(() => {
+            textarea.focus();
+            textarea.selectionStart = nextCaret;
+            textarea.selectionEnd = nextCaret;
           });
-        } else {
-          editor.insertMarkdown(insertion);
+          return;
         }
-
-        setTimeout(() => {
-          const nextMarkdown = editor.getMarkdown?.();
-          if (typeof nextMarkdown === 'string' && nextMarkdown !== md) {
-            handleContentChange(nextMarkdown);
-            return;
-          }
-
-          // Some rich-text states expose insertMarkdown but ignore it without an active caret.
-          handleContentChange(md + insertion);
-        }, 0);
-        return;
       }
 
-      handleContentChange(md + insertion);
+      handleContentChange(base + insertion);
     },
-    [handleContentChange],
+    [handleContentChange, livePreviewEnabled],
   );
 
   useEffect(() => {
@@ -728,12 +700,8 @@ export function NoteWindow() {
   };
 
   const toggleEditorMode = useCallback(() => {
-    const latestMarkdown = mdxEditorRef.current?.getMarkdown?.();
-    if (typeof latestMarkdown === 'string' && latestMarkdown !== (noteRef.current?.content || '')) {
-      handleContentChange(latestMarkdown);
-    }
     setLivePreviewEnabled(v => !v);
-  }, [handleContentChange]);
+  }, []);
 
   const handleTextareaKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (!note) return;
@@ -849,10 +817,10 @@ export function NoteWindow() {
             onClick={toggleEditorMode}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.08)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            title={livePreviewEnabled ? '切换到源码模式' : '切换到所见即所得'}
-            aria-label={livePreviewEnabled ? '切换到源码模式' : '切换到所见即所得'}
+            title={livePreviewEnabled ? '切换到源码模式' : '切换到预览模式'}
+            aria-label={livePreviewEnabled ? '切换到源码模式' : '切换到预览模式'}
           >
-            {livePreviewEnabled ? '源码' : '所见'}
+            {livePreviewEnabled ? '源码' : '预览'}
           </button>
 
           <button
@@ -1004,23 +972,26 @@ export function NoteWindow() {
             }
           `}</style>
 
-          <MDXEditor
-            key={livePreviewEnabled ? 'rich-text' : 'source'}
-            ref={mdxEditorRef}
-            markdown={note.content}
-            onChange={(md: string) => handleContentChange(md)}
-            className="note-mdx-editor"
-            contentEditableClassName="note-mdx-prose"
-            readOnly={actionBusy}
-            plugins={[
-              headingsPlugin(),
-              listsPlugin(),
-              quotePlugin(),
-              thematicBreakPlugin(),
-              markdownShortcutPlugin(),
-              diffSourcePlugin({ viewMode: livePreviewEnabled ? 'rich-text' : 'source' }),
-            ]}
-          />
+          {livePreviewEnabled ? (
+            <div
+              className="note-markdown-preview"
+              style={{ ...styles.preview, fontSize: `${noteFontSize}px`, overflowY: 'auto' }}
+              dangerouslySetInnerHTML={{ __html: renderMarkdownToSafeHtml(note.content || '') }}
+              aria-label="便签预览"
+            />
+          ) : (
+            <textarea
+              ref={sourceTextareaRef}
+              className="note-source-textarea"
+              value={note.content}
+              onChange={e => handleContentChange(e.target.value)}
+              onKeyDown={handleTextareaKeyDown}
+              readOnly={actionBusy}
+              spellCheck={false}
+              style={{ ...styles.textarea, fontSize: `${noteFontSize}px`, padding: '10px 16px 18px' }}
+              aria-label="便签源码编辑器"
+            />
+          )}
         </div>
       </div>
 

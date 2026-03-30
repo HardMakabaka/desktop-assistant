@@ -28,33 +28,6 @@ async function waitForWindow(electronApp, predicate, timeoutMs = 15000) {
   throw new Error('Timed out waiting for target Electron window');
 }
 
-async function getScrollMetrics(page, selector) {
-  return page.locator(selector).evaluate(node => ({
-    scrollTop: node.scrollTop,
-    scrollHeight: node.scrollHeight,
-    clientHeight: node.clientHeight,
-  }));
-}
-
-async function setScrollTop(page, selector, value) {
-  await page.locator(selector).evaluate((node, nextValue) => {
-    node.scrollTop = nextValue;
-  }, value);
-}
-
-async function wheelScroll(page, selector, deltaY = 1200) {
-  const locator = page.locator(selector);
-  await locator.waitFor({ state: 'visible' });
-  const box = await locator.boundingBox();
-  if (!box) {
-    throw new Error(`No bounding box for ${selector}`);
-  }
-
-  await page.mouse.move(box.x + Math.min(24, box.width / 2), box.y + Math.min(24, box.height / 2));
-  await page.mouse.wheel(0, deltaY);
-  await page.waitForTimeout(250);
-}
-
 async function ensureSourceMode(page) {
   const sourceEditor = page.locator('.note-source-textarea');
   if (await sourceEditor.isVisible().catch(() => false)) {
@@ -80,6 +53,19 @@ async function ensurePreviewMode(page) {
   await preview.waitFor({ state: 'visible' });
   return preview;
 }
+
+async function getCurrentNoteContent(page) {
+  return page.evaluate(async () => {
+    const noteId = new URLSearchParams(window.location.search).get('id');
+    const notes = await window.desktopAPI.getNotes();
+    return notes.find(note => note.id === noteId)?.content ?? null;
+  });
+}
+
+async function getScrollTop(page, selector) {
+  return page.locator(selector).evaluate(node => node.scrollTop);
+}
+
 
 async function main() {
   const appDataRoot = await mkdtemp(path.join(os.tmpdir(), 'desktop-assistant-e2e-'));
@@ -112,39 +98,43 @@ async function main() {
 
     await noteWindow.bringToFront();
     await noteWindow.getByRole('button', { name: 'OCR 截图识别文字' }).waitFor({ state: 'visible' });
+
+    const sourceTail = ' [source-tail-check]';
+    const longText = Array.from({ length: 160 }, (_, index) => `- caret test line ${index + 1} lorem ipsum dolor sit amet`).join('\n');
+
     await ensureSourceMode(noteWindow);
-
-    const longText = Array.from({ length: 160 }, (_, index) => `- scroll test line ${index + 1} lorem ipsum dolor sit amet`).join('\n');
-
     await noteWindow.locator('.note-source-textarea').click();
     await noteWindow.keyboard.insertText(longText);
     await noteWindow.waitForTimeout(700);
+    await noteWindow.keyboard.press('Control+End');
+    await noteWindow.locator('.note-source-textarea').evaluate(node => {
+      node.scrollTop = node.scrollHeight;
+    });
+    const sourceScrollBefore = await getScrollTop(noteWindow, '.note-source-textarea');
+    await noteWindow.keyboard.type(sourceTail, { delay: 60 });
+    await noteWindow.waitForTimeout(700);
+    const sourceScrollAfter = await getScrollTop(noteWindow, '.note-source-textarea');
+    const sourceContent = await getCurrentNoteContent(noteWindow);
 
-    await setScrollTop(noteWindow, '.note-source-textarea', 0);
-    const sourceBefore = await getScrollMetrics(noteWindow, '.note-source-textarea');
-    assert(sourceBefore.scrollHeight > sourceBefore.clientHeight, 'Source mode should overflow vertically');
-
-    await wheelScroll(noteWindow, '.note-source-textarea');
-    const sourceAfter = await getScrollMetrics(noteWindow, '.note-source-textarea');
-    assert(sourceAfter.scrollTop > sourceBefore.scrollTop + 100, 'Mouse wheel should scroll in source mode');
+    assert.equal(sourceContent, `${longText}${sourceTail}`);
+    assert(sourceScrollBefore > 100, 'Source mode should be scrolled away from the top before typing');
+    assert(sourceScrollAfter > 100, 'Source mode typing should not jump back to the top');
 
     await ensurePreviewMode(noteWindow);
-    await noteWindow.waitForTimeout(400);
+    await noteWindow.waitForTimeout(500);
+    const previewHtml = await noteWindow.locator('.note-markdown-preview').innerHTML();
+    assert(previewHtml.includes('source-tail-check'), 'Preview mode should render the latest markdown content');
 
-    await setScrollTop(noteWindow, '.note-markdown-preview', 0);
-    const previewBefore = await getScrollMetrics(noteWindow, '.note-markdown-preview');
-    assert(previewBefore.scrollHeight > previewBefore.clientHeight, 'Preview mode should overflow vertically');
-
-    await wheelScroll(noteWindow, '.note-markdown-preview');
-    const previewAfter = await getScrollMetrics(noteWindow, '.note-markdown-preview');
-    assert(previewAfter.scrollTop > previewBefore.scrollTop + 100, 'Mouse wheel should scroll in preview mode');
+    await ensureSourceMode(noteWindow);
+    const sourceValueAfterPreview = await noteWindow.locator('.note-source-textarea').inputValue();
+    assert.equal(sourceValueAfterPreview, `${longText}${sourceTail}`);
 
     console.log(
       JSON.stringify(
         {
           ok: true,
-          sourceMode: sourceAfter,
-          previewMode: previewAfter,
+          sourceScrollBefore,
+          sourceScrollAfter,
         },
         null,
         2,

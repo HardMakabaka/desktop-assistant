@@ -45,17 +45,17 @@ async function dragSelect(page, selector) {
 
 async function getMarkdown(page) {
   return page.evaluate(() => {
-    const source = document.querySelector('.cm-content');
-    if (source) {
-      return source.textContent || '';
+    const source = document.querySelector('.note-source-textarea');
+    if (source instanceof HTMLTextAreaElement) {
+      return source.value || '';
     }
-    const rich = document.querySelector('.mdxeditor-root-contenteditable');
-    return rich?.textContent || '';
+    const preview = document.querySelector('.note-markdown-preview');
+    return preview?.textContent || '';
   });
 }
 
 async function ensureSourceMode(page) {
-  const sourceEditor = page.locator('.cm-editor');
+  const sourceEditor = page.locator('.note-source-textarea');
   if (await sourceEditor.isVisible().catch(() => false)) {
     return sourceEditor;
   }
@@ -67,17 +67,17 @@ async function ensureSourceMode(page) {
   return sourceEditor;
 }
 
-async function ensureRichMode(page) {
-  const richEditor = page.locator('.note-mdx-prose');
-  if (await richEditor.isVisible().catch(() => false)) {
-    return richEditor;
+async function ensurePreviewMode(page) {
+  const preview = page.locator('.note-markdown-preview');
+  if (await preview.isVisible().catch(() => false)) {
+    return preview;
   }
 
-  const switchButton = page.getByRole('button', { name: '切换到所见即所得' });
+  const switchButton = page.getByRole('button', { name: '切换到预览模式' });
   await switchButton.waitFor({ state: 'visible' });
   await switchButton.click();
-  await richEditor.waitFor({ state: 'visible' });
-  return richEditor;
+  await preview.waitFor({ state: 'visible' });
+  return preview;
 }
 
 async function main() {
@@ -113,13 +113,13 @@ async function main() {
     await noteWindow.bringToFront();
     await noteWindow.getByRole('button', { name: 'OCR 截图识别文字' }).waitFor({ state: 'visible' });
     await ensureSourceMode(noteWindow);
-    await noteWindow.locator('.cm-content').click();
+    await noteWindow.locator('.note-source-textarea').click();
     await noteWindow.keyboard.insertText('# Sync heading\nsource side text');
     await noteWindow.waitForTimeout(500);
 
-    const richEditor = await ensureRichMode(noteWindow);
-    await expectText(richEditor, 'Sync heading');
-    await expectText(richEditor, 'source side text');
+    const preview = await ensurePreviewMode(noteWindow);
+    await expectText(preview, 'Sync heading');
+    await expectText(preview, 'source side text');
 
     await noteWindow.getByRole('button', { name: 'OCR 截图识别文字' }).click();
 
@@ -143,14 +143,15 @@ async function main() {
     }
 
     await noteWindow.bringToFront();
-    await richEditor.waitFor({ state: 'visible' });
+    await preview.waitFor({ state: 'visible' });
     await noteWindow.getByText('OCR 识别结果已插入').waitFor({ state: 'visible' });
+    await expectText(preview, 'OCR inserted line');
 
     await ensureSourceMode(noteWindow);
-    const sourceEditor = noteWindow.locator('.cm-content');
-    await expectText(sourceEditor, 'Sync heading');
-    await expectText(sourceEditor, 'source side text');
-    await expectText(sourceEditor, 'OCR inserted line');
+    const sourceEditor = noteWindow.locator('.note-source-textarea');
+    await expectInputValue(sourceEditor, 'Sync heading');
+    await expectInputValue(sourceEditor, 'source side text');
+    await expectInputValue(sourceEditor, 'OCR inserted line');
 
     const markdown = await getMarkdown(noteWindow);
     assert.match(markdown, /Sync heading/);
@@ -185,6 +186,18 @@ async function expectText(locator, text) {
     await sleep(150);
   }
   throw new Error(`Timed out waiting for text: ${text}`);
+}
+
+async function expectInputValue(locator, text) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < 10000) {
+    const value = await locator.inputValue();
+    if ((value || '').includes(text)) {
+      return;
+    }
+    await sleep(150);
+  }
+  throw new Error(`Timed out waiting for input value: ${text}`);
 }
 
 main().catch(error => {
